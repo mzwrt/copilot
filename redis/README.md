@@ -155,8 +155,8 @@ cd redis
 docker compose -f docker-compose.ghcr.yml up -d
 
 # 或手动拉取并运行
-docker pull <你的用户名>/redis:latest
-docker run -d --name redis <你的用户名>/redis:latest
+docker pull ihccccom/redis:latest
+docker run -d --name redis ihccccom/redis:latest
 ```
 
 #### 版本标签说明
@@ -181,8 +181,8 @@ docker run -d --name redis <你的用户名>/redis:latest
 #### 步骤 1：克隆仓库
 
 ```bash
-git clone https://github.com/<你的用户名>/<你的仓库名>.git
-cd <你的仓库名>/redis
+git clone https://github.com/mzwrt/copilot.git
+cd copilot/redis
 ```
 
 #### 步骤 2：（可选）自定义构建参数

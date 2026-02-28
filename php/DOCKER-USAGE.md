@@ -54,7 +54,7 @@ rm ~/.dockerhub_token
 ```yaml
 services:
   php:
-    image: <你的用户名>/php-fpm:latest
+    image: ihccccom/php-fpm:latest
 ```
 
 ### 步骤 3：启动
@@ -168,7 +168,7 @@ services:
       - php
 
   php:
-    image: <你的用户名>/php-fpm:latest
+    image: ihccccom/php-fpm:latest
     volumes:
       - wwwroot:/www/wwwroot
     networks:

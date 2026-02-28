@@ -59,7 +59,7 @@ rm ~/.dockerhub_token
 ```yaml
 services:
   nginx:
-    image: <你的用户名>/nginx:latest
+    image: ihccccom/nginx:latest
 ```
 
 ### 步骤 3：启动

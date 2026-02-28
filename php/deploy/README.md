@@ -13,7 +13,7 @@ git clone <仓库地址>
 cd <仓库名>
 
 # 2. 修改 docker-compose.yml 中的 image 地址
-# image: <你的用户名>/php-fpm:latest
+# image: ihccccom/php-fpm:latest
 
 # 3. 启动容器
 docker compose up -d

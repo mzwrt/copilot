@@ -241,12 +241,12 @@ cd nginx
 
 # 方式一：使用 docker-compose.ghcr.yml（推荐）
 # 先编辑 docker-compose.ghcr.yml，修改 image 为你的镜像地址
-# image: <你的用户名>/nginx:latest
+# image: ihccccom/nginx:latest
 docker compose -f docker-compose.ghcr.yml up -d
 
 # 方式二：手动拉取并运行
-docker pull <你的用户名>/nginx:latest
-docker run -d -p 80:80 -p 443:443 --name nginx <你的用户名>/nginx:latest
+docker pull ihccccom/nginx:latest
+docker run -d -p 80:80 -p 443:443 --name nginx ihccccom/nginx:latest
 ```
 
 #### 步骤 7：验证
@@ -284,8 +284,8 @@ docker logs nginx
 #### 步骤 1：克隆仓库
 
 ```bash
-git clone https://github.com/<你的用户名>/<你的仓库名>.git
-cd <你的仓库名>/nginx
+git clone https://github.com/mzwrt/copilot.git
+cd copilot/nginx
 ```
 
 #### 步骤 2：（可选）自定义构建参数
