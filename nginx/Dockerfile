@@ -190,7 +190,7 @@ RUN mkdir -p ${NGINX_SRC_DIR} \
 
 # 下载 Nginx 源码
 RUN cd ${NGINX_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" \
     && tar -zxf "nginx-${NGINX_VERSION}.tar.gz" \
     && mv "nginx-${NGINX_VERSION}" nginx \
@@ -232,7 +232,7 @@ RUN set -eux; \
           | grep -oP '"tag_name":\s*"\K[^"]+') || true; \
         if [ -z "$pcre2_version" ]; then pcre2_version="pcre2-10.45"; fi; \
       fi; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://github.com/PhilipHazel/pcre2/releases/download/$pcre2_version/$pcre2_version.tar.gz"; \
       tar -zxf "$pcre2_version.tar.gz"; \
       mv "$pcre2_version" pcre2; \
@@ -243,7 +243,7 @@ RUN set -eux; \
 RUN set -eux; \
     if [ "${USE_openssl}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"; \
       tar -zxf "openssl-${OPENSSL_VERSION}.tar.gz"; \
       mv "openssl-${OPENSSL_VERSION}" openssl; \
@@ -271,7 +271,7 @@ RUN set -eux; \
           | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
         if [ -z "$version" ]; then version="2.3"; fi; \
       fi; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://github.com/FRiCKLE/ngx_cache_purge/archive/refs/tags/$version.zip"; \
       unzip "$version.zip"; \
       mv "ngx_cache_purge-$version" ngx_cache_purge; \
@@ -290,7 +290,7 @@ RUN set -eux; \
           | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4 | sed 's/^v//') || true; \
         if [ -z "$version" ]; then version="0.38"; fi; \
       fi; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v${version}.tar.gz"; \
       tar -xzf "v${version}.tar.gz"; \
       mv "headers-more-nginx-module-${version}" headers-more-nginx-module; \
@@ -309,7 +309,7 @@ RUN set -eux; \
           | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
         if [ -z "$version" ]; then echo "错误：无法获取 ngx_http_proxy_connect_module 版本"; exit 1; fi; \
       fi; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://github.com/chobits/ngx_http_proxy_connect_module/archive/refs/tags/$version.zip"; \
       unzip "$version.zip"; \
       rm -f "$version.zip"; \
@@ -324,7 +324,7 @@ RUN set -eux; \
 RUN set -eux; \
     if [ "${USE_ngx_fancyindex}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      wget --tries=5 --waitretry=2 --no-check-certificate \
+      wget --tries=5 --waitretry=2 \
         "https://github.com/aperezdc/ngx-fancyindex/releases/download/v${FANCYINDEX_VERSION}/ngx-fancyindex-${FANCYINDEX_VERSION}.tar.xz"; \
       tar -xJf "ngx-fancyindex-${FANCYINDEX_VERSION}.tar.xz"; \
       mv "ngx-fancyindex-${FANCYINDEX_VERSION}" ngx_fancyindex; \

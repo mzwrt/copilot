@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =======================================================
-# PHP-FPM Docker 容器安全配置验证脚本
-# 验证 CIS Docker Benchmark 合规性
+# PostgreSQL Docker 容器安全配置验证脚本
+# 验证 CIS Docker Benchmark 和 PCI DSS 合规性
 # =======================================================
 #
 # 用法：
 #   ./validate.sh [容器名称]
 #
 # 参数：
-#   容器名称  - 要验证的 Docker 容器名称（默认: php）
+#   容器名称  - 要验证的 Docker 容器名称（默认: postgresql）
 #
 # 示例：
 #   ./validate.sh
-#   ./validate.sh my-php
+#   ./validate.sh my-postgresql
 #
 
 set -euo pipefail
@@ -21,11 +21,11 @@ set -euo pipefail
 # 全局变量
 # ============================================================
 
-# 容器名称，默认为 "php"
-CONTAINER_NAME="${1:-php}"
+# 容器名称，默认为 "postgresql"
+CONTAINER_NAME="${1:-postgresql}"
 
-# PHP 安装目录
-PHP_DIR="/opt/php"
+# PostgreSQL 安装目录
+PG_DIR="/opt/postgresql"
 
 # 测试计数器
 PASS_COUNT=0
@@ -194,98 +194,118 @@ test_container() {
 }
 
 # ============================================================
-# PHP-FPM 服务测试
+# PostgreSQL 服务测试
 # ============================================================
-test_php_fpm() {
-    section "PHP-FPM 服务测试 (PHP-FPM Service Tests)"
+test_postgresql() {
+    section "PostgreSQL 服务测试 (PostgreSQL Service Tests)"
 
-    # 检查 PHP-FPM 进程是否正在运行
-    local php_pid
-    php_pid=$(docker_exec pgrep -x php-fpm) || php_pid=""
-    if [[ -n "${php_pid}" ]]; then
-        pass "PHP-FPM 进程正在运行"
+    # 检查 PostgreSQL 进程是否正在运行
+    local pg_pid
+    pg_pid=$(docker_exec pgrep -x postgres) || pg_pid=""
+    if [[ -n "${pg_pid}" ]]; then
+        pass "PostgreSQL 进程正在运行"
     else
-        fail "PHP-FPM 进程未运行"
-        info "后续 PHP-FPM 测试将被跳过"
+        fail "PostgreSQL 进程未运行"
+        info "后续 PostgreSQL 测试将被跳过"
         return
     fi
 
-    # 检查 PHP-FPM 是否在 36000 端口监听
+    # 检查 PostgreSQL 是否在 55432 端口监听
     local port_listen
-    port_listen=$(docker_exec sh -c "ss -tlnp 2>/dev/null | grep ':36000' || netstat -tlnp 2>/dev/null | grep ':36000'") || port_listen=""
+    port_listen=$(docker_exec sh -c "ss -tlnp 2>/dev/null | grep ':55432' || netstat -tlnp 2>/dev/null | grep ':55432'") || port_listen=""
     if [[ -n "${port_listen}" ]]; then
-        pass "PHP-FPM 在端口 36000 正常监听"
+        pass "PostgreSQL 在端口 55432 正常监听"
     else
-        # 尝试使用其他方式检查
-        local fpm_conf_listen
-        fpm_conf_listen=$(docker_exec grep -r "^listen" "${PHP_DIR}/etc/php-fpm.d/" 2>/dev/null) || fpm_conf_listen=""
-        if [[ -n "${fpm_conf_listen}" ]]; then
-            info "PHP-FPM 监听配置: ${fpm_conf_listen}"
+        local pg_conf_port
+        pg_conf_port=$(docker_exec grep "^port" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || pg_conf_port=""
+        if [[ -n "${pg_conf_port}" ]]; then
+            info "PostgreSQL 端口配置: ${pg_conf_port}"
         else
-            fail "PHP-FPM 端口 36000 未监听"
+            fail "PostgreSQL 端口 55432 未监听"
         fi
     fi
 
-    # 检查 PHP 版本信息
-    local php_version
-    php_version=$(docker_exec php -v 2>/dev/null | head -1) || php_version=""
-    if [[ -n "${php_version}" ]]; then
-        pass "PHP 版本: ${php_version}"
+    # 检查 PostgreSQL 版本信息
+    local pg_version
+    pg_version=$(docker_exec ${PG_DIR}/bin/postgres --version 2>/dev/null) || pg_version=""
+    if [[ -n "${pg_version}" ]]; then
+        pass "PostgreSQL 版本: ${pg_version}"
     else
-        fail "无法获取 PHP 版本信息"
+        fail "无法获取 PostgreSQL 版本信息"
     fi
 
-    # 检查 expose_php 是否关闭（安全）
-    local expose_php
-    expose_php=$(docker_exec php -i 2>/dev/null | grep "^expose_php" | awk '{print $NF}') || expose_php=""
-    if [[ "${expose_php}" == "Off" ]]; then
-        pass "expose_php 已关闭（安全）"
-    elif [[ -n "${expose_php}" ]]; then
-        fail "expose_php 未关闭: ${expose_php}"
+    # CIS 6.7 - 检查密码加密方式是否为 scram-sha-256
+    local password_encryption
+    password_encryption=$(docker_exec grep "^password_encryption" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || password_encryption=""
+    if echo "${password_encryption}" | grep -q "scram-sha-256"; then
+        pass "密码加密方式为 scram-sha-256 (CIS 6.7)"
+    elif [[ -n "${password_encryption}" ]]; then
+        fail "密码加密方式不安全: ${password_encryption} (CIS 6.7)"
     else
-        skip "无法检查 expose_php 配置"
+        skip "无法检查密码加密配置"
     fi
 
-    # 检查 disable_functions 是否配置
-    local disable_functions
-    disable_functions=$(docker_exec php -i 2>/dev/null | grep "^disable_functions" | head -1) || disable_functions=""
-    if [[ -n "${disable_functions}" ]] && [[ "${disable_functions}" != *"no value"* ]]; then
-        pass "已配置 disable_functions 安全限制"
+    # CIS 6.2 - 检查认证超时
+    local auth_timeout
+    auth_timeout=$(docker_exec grep "^authentication_timeout" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || auth_timeout=""
+    if [[ -n "${auth_timeout}" ]]; then
+        pass "已配置认证超时: ${auth_timeout} (CIS 6.2)"
     else
-        fail "未配置 disable_functions（安全风险）"
+        fail "未配置认证超时 (CIS 6.2)"
     fi
 
-    # 检查 allow_url_include 是否关闭
-    local allow_url_include
-    allow_url_include=$(docker_exec php -i 2>/dev/null | grep "^allow_url_include" | awk '{print $NF}') || allow_url_include=""
-    if [[ "${allow_url_include}" == "Off" ]]; then
-        pass "allow_url_include 已关闭（安全）"
-    elif [[ -n "${allow_url_include}" ]]; then
-        fail "allow_url_include 未关闭: ${allow_url_include}"
+    # CIS 6.9 - 检查连接日志
+    local log_connections
+    log_connections=$(docker_exec grep "^log_connections" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || log_connections=""
+    if echo "${log_connections}" | grep -q "on"; then
+        pass "已启用连接日志记录 (CIS 6.9)"
     else
-        skip "无法检查 allow_url_include 配置"
+        fail "未启用连接日志记录 (CIS 6.9)"
     fi
 
-    # 检查 OPcache 状态
-    local opcache_enabled
-    opcache_enabled=$(docker_exec php -i 2>/dev/null | grep "opcache.enable =>" | head -1 | awk '{print $NF}') || opcache_enabled=""
-    if [[ "${opcache_enabled}" == "On" ]] || [[ "${opcache_enabled}" == "1" ]]; then
-        pass "OPcache 已启用（性能优化）"
-    elif [[ -n "${opcache_enabled}" ]]; then
-        info "OPcache 未启用: ${opcache_enabled}"
+    # CIS 6.9 - 检查断开连接日志
+    local log_disconnections
+    log_disconnections=$(docker_exec grep "^log_disconnections" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || log_disconnections=""
+    if echo "${log_disconnections}" | grep -q "on"; then
+        pass "已启用断开连接日志记录 (CIS 6.9)"
     else
-        info "OPcache 模块可能未安装"
+        fail "未启用断开连接日志记录 (CIS 6.9)"
     fi
 
-    # 检查已加载的扩展
-    local extensions
-    extensions=$(docker_exec php -m 2>/dev/null) || extensions=""
-    if [[ -n "${extensions}" ]]; then
-        local ext_count
-        ext_count=$(echo "${extensions}" | grep -v '^\[' | grep -v '^$' | wc -l)
-        pass "已加载 ${ext_count} 个 PHP 扩展"
+    # CIS 6.12 - 检查 DDL 日志
+    local log_statement
+    log_statement=$(docker_exec grep "^log_statement" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || log_statement=""
+    if echo "${log_statement}" | grep -q "ddl"; then
+        pass "已启用 DDL 语句日志记录 (CIS 6.12)"
     else
-        fail "无法获取 PHP 扩展列表"
+        fail "未启用 DDL 语句日志记录 (CIS 6.12)"
+    fi
+
+    # CIS 6.5 - 检查行级安全
+    local row_security
+    row_security=$(docker_exec grep "^row_security" "${PG_DIR}/etc/postgresql.conf" 2>/dev/null) || row_security=""
+    if echo "${row_security}" | grep -q "on"; then
+        pass "已启用行级安全 (CIS 6.5)"
+    else
+        fail "未启用行级安全 (CIS 6.5)"
+    fi
+
+    # 检查 pg_hba.conf 是否使用 scram-sha-256 认证
+    local hba_auth
+    hba_auth=$(docker_exec grep -c "scram-sha-256" "${PG_DIR}/etc/pg_hba.conf" 2>/dev/null) || hba_auth="0"
+    if [[ "${hba_auth}" -gt 0 ]]; then
+        pass "pg_hba.conf 使用 scram-sha-256 认证 (CIS 6.1)"
+    else
+        fail "pg_hba.conf 未使用 scram-sha-256 认证 (CIS 6.1)"
+    fi
+
+    # 检查是否禁用 trust 认证
+    local trust_auth
+    trust_auth=$(docker_exec grep -c "^\s*[^#].*trust" "${PG_DIR}/etc/pg_hba.conf" 2>/dev/null) || trust_auth="0"
+    if [[ "${trust_auth}" -eq 0 ]]; then
+        pass "pg_hba.conf 未使用不安全的 trust 认证"
+    else
+        fail "pg_hba.conf 存在不安全的 trust 认证"
     fi
 }
 
@@ -297,7 +317,7 @@ test_file_permissions() {
 
     # 检查配置文件是否不可被其他用户读取
     local conf_world_readable
-    conf_world_readable=$(docker_exec find "${PHP_DIR}/etc" -type f -perm -o=r 2>/dev/null) || conf_world_readable=""
+    conf_world_readable=$(docker_exec find "${PG_DIR}/etc" -type f -perm -o=r 2>/dev/null) || conf_world_readable=""
     if [[ -z "${conf_world_readable}" ]]; then
         pass "配置文件不可被其他用户读取 (CIS)"
     else
@@ -306,9 +326,22 @@ test_file_permissions() {
         fail "发现 ${count} 个配置文件可被其他用户读取 (CIS)"
     fi
 
+    # 检查数据目录权限（PostgreSQL 要求 700）
+    local data_dir_perms
+    data_dir_perms=$(docker_exec stat -c '%a' "${PG_DIR}/data" 2>/dev/null) || data_dir_perms=""
+    if [[ -n "${data_dir_perms}" ]]; then
+        if [[ $((8#${data_dir_perms})) -le $((8#700)) ]]; then
+            pass "数据目录权限正确: ${data_dir_perms}（PostgreSQL 要求 700）"
+        else
+            fail "数据目录权限过宽: ${data_dir_perms}，应为 700"
+        fi
+    else
+        skip "数据目录不存在，跳过权限检查"
+    fi
+
     # 检查日志目录权限
     local log_dir_perms
-    log_dir_perms=$(docker_exec stat -c '%a' "${PHP_DIR}/var/log" 2>/dev/null) || log_dir_perms=""
+    log_dir_perms=$(docker_exec stat -c '%a' "${PG_DIR}/var/log" 2>/dev/null) || log_dir_perms=""
     if [[ -n "${log_dir_perms}" ]]; then
         if [[ $((8#${log_dir_perms})) -le $((8#750)) ]]; then
             pass "日志目录权限正确: ${log_dir_perms}"
@@ -319,17 +352,17 @@ test_file_permissions() {
         skip "日志目录不存在，跳过权限检查"
     fi
 
-    # 检查 session 目录权限
-    local session_dir_perms
-    session_dir_perms=$(docker_exec stat -c '%a' "/tmp/php-session" 2>/dev/null) || session_dir_perms=""
-    if [[ -n "${session_dir_perms}" ]]; then
-        if [[ $((8#${session_dir_perms})) -le $((8#700)) ]]; then
-            pass "Session 目录权限正确: ${session_dir_perms}"
+    # 检查 WAL 目录权限
+    local wal_dir_perms
+    wal_dir_perms=$(docker_exec stat -c '%a' "${PG_DIR}/wal" 2>/dev/null) || wal_dir_perms=""
+    if [[ -n "${wal_dir_perms}" ]]; then
+        if [[ $((8#${wal_dir_perms})) -le $((8#700)) ]]; then
+            pass "WAL 目录权限正确: ${wal_dir_perms}"
         else
-            fail "Session 目录权限过宽: ${session_dir_perms}，应为 700 或更严格"
+            fail "WAL 目录权限过宽: ${wal_dir_perms}，应为 700"
         fi
     else
-        skip "Session 目录不存在，跳过权限检查"
+        skip "WAL 目录不存在，跳过权限检查"
     fi
 }
 
@@ -360,7 +393,7 @@ print_summary() {
 # ============================================================
 main() {
     echo ""
-    echo -e "${BOLD}PHP-FPM Docker 容器安全配置验证${NC}"
+    echo -e "${BOLD}PostgreSQL Docker 容器安全配置验证${NC}"
     echo -e "目标容器: ${BOLD}${CONTAINER_NAME}${NC}"
     echo -e "验证时间: $(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -383,7 +416,7 @@ main() {
 
     # 执行各类测试
     test_container
-    test_php_fpm
+    test_postgresql
     test_file_permissions
 
     # 打印测试摘要

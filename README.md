@@ -1,43 +1,45 @@
-# Nginx + PHP-FPM + Redis Docker 安全部署方案
+# Nginx + PHP-FPM + Redis + PostgreSQL Docker 安全部署方案
 
-基于 CIS Docker Benchmark、CIS Nginx Benchmark 和 PCI DSS v4.0 标准的 Nginx + PHP-FPM + Redis 安全容器化部署方案。
+基于 CIS Docker Benchmark、CIS Nginx Benchmark、CIS PostgreSQL Benchmark 和 PCI DSS v4.0 标准的 Nginx + PHP-FPM + Redis + PostgreSQL 安全容器化部署方案。
 
 ## 项目概述
 
-本项目提供一套**生产级**的 Web 应用基础设施 Docker 安全部署方案，包含三个核心组件：
+本项目提供一套**生产级**的 Web 应用基础设施 Docker 安全部署方案，包含四个核心组件：
 
 | 组件 | 说明 | 端口 | 详细教程 |
 |------|------|------|---------|
 | **Nginx** | 高性能 Web 服务器 + 反向代理 + WAF | 80/443（对外） | [nginx/README.md](nginx/README.md) |
 | **PHP-FPM** | PHP 应用执行引擎 | 36000（内部） | [php/README.md](php/README.md) |
 | **Redis** | 高性能内存数据库 / Session / 缓存 | 36379（内部） | [redis/README.md](redis/README.md) |
+| **PostgreSQL** | 高性能关系型数据库 | 55432（内部） | [postgresql/README.md](postgresql/README.md) |
 
-> ⚠️ PHP-FPM 和 Redis 均使用高位端口（36000、36379），避免与常见服务冲突，增强安全性。
+> ⚠️ PHP-FPM、Redis 和 PostgreSQL 均使用高位端口（36000、36379、55432），避免与常见服务冲突，增强安全性。
 
 ---
 
 ## 架构概览
 
 ```
-                  ┌────── Docker Network: nginx-network ──────┐
-                  │                                           │
-  客户端请求 ───▶ │  ┌─────────┐  TCP:36000  ┌─────────────┐ │
-  HTTP/HTTPS      │  │  Nginx  │ ──────────▶ │  PHP-FPM    │ │
-  :80 / :443      │  │ 容器    │             │  容器        │ │
-                  │  └─────────┘             └──────┬──────┘ │
-                  │       │                         │        │
-                  │       │                    TCP:36379      │
-                  │       │                         │        │
-                  │       │                  ┌──────▼──────┐ │
-                  │       │                  │    Redis    │ │
-                  │       │                  │    容器     │ │
-                  │       │                  └─────────────┘ │
-                  │       ▼                         ▼        │
-                  │  ┌──────────────────────────────────┐    │
-                  │  │   共享卷: wwwroot                │    │
-                  │  │   /www/wwwroot                   │    │
-                  │  └──────────────────────────────────┘    │
-                  └──────────────────────────────────────────┘
+                  ┌────────── Docker Network: nginx-network ──────────┐
+                  │                                                   │
+  客户端请求 ───▶ │  ┌─────────┐  TCP:36000  ┌─────────────┐         │
+  HTTP/HTTPS      │  │  Nginx  │ ──────────▶ │  PHP-FPM    │         │
+  :80 / :443      │  │ 容器    │             │  容器        │         │
+                  │  └─────────┘             └──────┬──────┘         │
+                  │       │                    ┌────┴────┐            │
+                  │       │                    │         │            │
+                  │       │               TCP:36379  TCP:55432        │
+                  │       │                    │         │            │
+                  │       │             ┌──────▼───┐ ┌──▼──────────┐ │
+                  │       │             │  Redis   │ │ PostgreSQL  │ │
+                  │       │             │  容器    │ │ 容器        │ │
+                  │       │             └──────────┘ └─────────────┘ │
+                  │       ▼                    ▼                      │
+                  │  ┌──────────────────────────────────┐            │
+                  │  │   共享卷: wwwroot                │            │
+                  │  │   /www/wwwroot                   │            │
+                  │  └──────────────────────────────────┘            │
+                  └──────────────────────────────────────────────────┘
 ```
 
 **工作原理**：
@@ -45,13 +47,15 @@
 2. Nginx 处理静态文件（HTML、CSS、JS、图片等）直接返回
 3. 当请求 `.php` 文件时，Nginx 通过 FastCGI 协议将请求转发到 PHP-FPM（TCP 36000 端口）
 4. PHP-FPM 执行 PHP 脚本，可通过 Redis 扩展连接 Redis（TCP 36379 端口）进行缓存/Session 存储
-5. PHP-FPM 将结果返回给 Nginx，Nginx 将响应返回给客户端
+5. PHP-FPM 可通过 PDO/pg_connect 连接 PostgreSQL（TCP 55432 端口）进行数据持久化存储
+6. PHP-FPM 将结果返回给 Nginx，Nginx 将响应返回给客户端
 
 **关键集成点**：
-- **网络通信**：三个容器通过 Docker 网络 `nginx-network` 使用各自端口通信
+- **网络通信**：四个容器通过 Docker 网络 `nginx-network` 使用各自端口通信
 - **文件共享**：Nginx 和 PHP-FPM 共享 `wwwroot` 卷（挂载到 `/www/wwwroot`）
 - **PHP-FPM 不暴露端口**：仅通过 Docker 内部网络访问
 - **Redis 不暴露端口**：仅通过 Docker 内部网络供 PHP-FPM 访问
+- **PostgreSQL 不暴露端口**：仅通过 Docker 内部网络供 PHP-FPM 访问
 
 ---
 
@@ -67,6 +71,9 @@
 # 启动 Redis
 cd redis && docker compose -f docker-compose.ghcr.yml up -d && cd ..
 
+# 启动 PostgreSQL
+cd postgresql && docker compose -f docker-compose.ghcr.yml up -d && cd ..
+
 # 启动 PHP-FPM
 cd php && docker compose -f docker-compose.ghcr.yml up -d && cd ..
 
@@ -81,6 +88,9 @@ cd nginx && docker compose -f docker-compose.ghcr.yml up -d && cd ..
 ```bash
 # 构建并启动 Redis
 cd redis && docker compose up -d && cd ..
+
+# 构建并启动 PostgreSQL
+cd postgresql && docker compose up -d && cd ..
 
 # 构建并启动 PHP-FPM
 cd php && docker compose up -d && cd ..
@@ -105,17 +115,18 @@ curl http://localhost/
 bash nginx/tests/validate.sh
 bash php/tests/validate.sh
 bash redis/tests/validate.sh
+bash postgresql/tests/validate.sh
 ```
 
 ---
 
-## Nginx + PHP-FPM + Redis 联合部署教程
+## Nginx + PHP-FPM + Redis + PostgreSQL 联合部署教程
 
-本章节详细说明如何将三个容器配合使用，实现完整的 PHP Web 应用部署方案，同时满足 CIS Docker Benchmark 和 PCI DSS v4.0 安全合规要求。
+本章节详细说明如何将四个容器配合使用，实现完整的 PHP Web 应用部署方案，同时满足 CIS Docker Benchmark 和 PCI DSS v4.0 安全合规要求。
 
 ### 步骤 1：按顺序启动容器
 
-三个容器必须按依赖顺序启动（Redis → PHP-FPM → Nginx）：
+四个容器必须按依赖顺序启动（Redis → PostgreSQL → PHP-FPM → Nginx）：
 
 ```bash
 # 1. 先启动 Redis（PHP-FPM 可能需要连接 Redis）
@@ -123,23 +134,28 @@ cd redis
 docker compose up -d
 cd ..
 
-# 2. 再启动 PHP-FPM（Nginx 依赖 PHP-FPM 的 DNS 解析）
+# 2. 启动 PostgreSQL（PHP-FPM 可能需要连接数据库）
+cd postgresql
+docker compose up -d
+cd ..
+
+# 3. 再启动 PHP-FPM（Nginx 依赖 PHP-FPM 的 DNS 解析）
 cd php
 docker compose up -d
 cd ..
 
-# 3. 最后启动 Nginx
+# 4. 最后启动 Nginx
 cd nginx
 docker compose up -d
 cd ..
 ```
 
-> **重要说明**：三个 docker-compose 文件都定义了同名的网络 `nginx-network`。Docker 会自动复用已存在的同名网络，因此三个容器会自动加入同一网络。
+> **重要说明**：四个 docker-compose 文件都定义了同名的网络 `nginx-network`。Docker 会自动复用已存在的同名网络，因此四个容器会自动加入同一网络。
 
 ### 步骤 2：验证集成
 
 ```bash
-# 1. 检查三个容器是否在同一网络
+# 1. 检查四个容器是否在同一网络
 docker network inspect nginx-network
 
 # 2. 检查 PHP-FPM 是否正常监听
@@ -148,11 +164,15 @@ docker exec php ss -tlnp | grep 36000
 # 3. 检查 Redis 是否正常运行
 docker exec redis /opt/redis/bin/redis-cli -p 36379 ping
 
-# 4. 检查 Nginx 能否解析其他容器名
+# 4. 检查 PostgreSQL 是否正常运行
+docker exec postgresql /opt/postgresql/bin/pg_isready -h 127.0.0.1 -p 55432
+
+# 5. 检查 Nginx 能否解析其他容器名
 docker exec nginx ping -c 1 php
 docker exec nginx ping -c 1 redis
+docker exec nginx ping -c 1 postgresql
 
-# 5. 创建测试 PHP 文件
+# 6. 创建测试 PHP 文件
 docker exec php sh -c 'echo "<?php phpinfo(); ?>" > /www/wwwroot/html/test.php'
 ```
 
@@ -299,21 +319,21 @@ EOF
 
 ## CIS 和 PCI DSS 安全合规清单
 
-Nginx + PHP-FPM + Redis 联合部署在以下安全基准方面已做加固：
+Nginx + PHP-FPM + Redis + PostgreSQL 联合部署在以下安全基准方面已做加固：
 
 ### 容器级安全（CIS Docker Benchmark v1.6.0）
 
-| CIS 编号 | 安全要求 | Nginx | PHP-FPM | Redis | 说明 |
-|----------|---------|:-----:|:-------:|:-----:|------|
-| 5.3 | cap_drop: ALL | ✅ | ✅ | ✅ | 丢弃所有 Linux 能力，仅添加必要能力 |
-| 5.4 | 非特权模式运行 | ✅ | ✅ | ✅ | 未使用 --privileged |
-| 5.10 | 内存限制 | ✅ 2G | ✅ 2G | ✅ 2G | 防止内存耗尽攻击 |
-| 5.11 | CPU 限制 | ✅ 4.0 | ✅ 4.0 | ✅ 4.0 | 防止 CPU 耗尽攻击 |
-| 5.12 | 只读根文件系统 | ✅ | ✅ | ✅ | read_only: true |
-| 5.18 | 限制共享内存 | ✅ 256m | ✅ 256m | ✅ 256m | shm_size 限制 |
-| 5.25 | no-new-privileges | ✅ | ✅ | ✅ | 禁止获取新权限 |
-| 5.26 | 健康检查 | ✅ | ✅ | ✅ | 定期检测服务状态 |
-| 5.28 | PID 限制 | ✅ 200 | ✅ 200 | ✅ 200 | 防止 Fork 炸弹 |
+| CIS 编号 | 安全要求 | Nginx | PHP-FPM | Redis | PostgreSQL | 说明 |
+|----------|---------|:-----:|:-------:|:-----:|:----------:|------|
+| 5.3 | cap_drop: ALL | ✅ | ✅ | ✅ | ✅ | 丢弃所有 Linux 能力，仅添加必要能力 |
+| 5.4 | 非特权模式运行 | ✅ | ✅ | ✅ | ✅ | 未使用 --privileged |
+| 5.10 | 内存限制 | ✅ 2G | ✅ 2G | ✅ 2G | ✅ 4G | 防止内存耗尽攻击 |
+| 5.11 | CPU 限制 | ✅ 4.0 | ✅ 4.0 | ✅ 4.0 | ✅ 4.0 | 防止 CPU 耗尽攻击 |
+| 5.12 | 只读根文件系统 | ✅ | ✅ | ✅ | ✅ | read_only: true |
+| 5.18 | 限制共享内存 | ✅ 256m | ✅ 256m | ✅ 256m | ✅ 512m | shm_size 限制 |
+| 5.25 | no-new-privileges | ✅ | ✅ | ✅ | ✅ | 禁止获取新权限 |
+| 5.26 | 健康检查 | ✅ | ✅ | ✅ | ✅ | 定期检测服务状态 |
+| 5.28 | PID 限制 | ✅ 200 | ✅ 200 | ✅ 200 | ✅ 300 | 防止 Fork 炸弹 |
 
 ### 网络安全（CIS Nginx Benchmark v2.0.1 / PCI DSS v4.0）
 
@@ -341,6 +361,12 @@ Nginx + PHP-FPM + Redis 联合部署在以下安全基准方面已做加固：
 | Redis 危险命令重命名 | rename-command | 禁用 FLUSHDB/FLUSHALL/DEBUG |
 | Redis protected-mode | protected-mode yes | 防止外部未授权连接 |
 | Redis ACL | 用户级访问控制 | Redis 7.x 细粒度权限管理（可选） |
+| PostgreSQL scram-sha-256 | password_encryption | 最安全的密码认证方式 |
+| PostgreSQL HBA 规则 | pg_hba.conf | 限制连接源和认证方式 |
+| PostgreSQL 行级安全 | row_security = on | 支持行级访问控制 |
+| PostgreSQL 审计日志 | log_connections/log_statement | PCI DSS 10.2 审计合规 |
+| PostgreSQL 搜索路径 | search_path = '"$user"' | 防止恶意对象注入（CIS 3.2） |
+| PostgreSQL 数据校验和 | --data-checksums | 数据完整性保护 |
 
 ### 可选安全模块
 
@@ -389,10 +415,10 @@ ACL 配置已在 `redis/conf/redis.conf` 中提供注释示例，取消注释即
 | 安全项 | 配置 | 说明 |
 |--------|------|------|
 | 网络隔离 | 专用 nginx-network | Docker bridge 网络隔离，非 host 模式 |
-| 高位端口 | PHP:36000 Redis:36379 | 避免常见端口扫描，增强安全性 |
-| 端口限制 | PHP-FPM / Redis 不暴露端口 | 仅通过 Docker 内部网络通信 |
-| 共享卷最小化 | 仅 Nginx+PHP 共享 wwwroot | Redis 使用独立数据卷 |
-| 日志隔离 | 各自独立日志卷 | nginx-logs、php-logs、redis-logs 分别挂载 |
+| 高位端口 | PHP:36000 Redis:36379 PG:55432 | 避免常见端口扫描，增强安全性 |
+| 端口限制 | PHP-FPM / Redis / PostgreSQL 不暴露端口 | 仅通过 Docker 内部网络通信 |
+| 共享卷最小化 | 仅 Nginx+PHP 共享 wwwroot | Redis、PostgreSQL 使用独立数据卷 |
+| 日志隔离 | 各自独立日志卷 | nginx-logs、php-logs、redis-logs、postgresql-logs 分别挂载 |
 
 ---
 
@@ -433,6 +459,17 @@ docker compose -f docker-compose.ghcr.yml up -d  # 拉取预构建镜像
 
 > 📖 详细教程: [redis/README.md](redis/README.md)
 
+### PostgreSQL 单独使用
+
+```bash
+cd postgresql
+docker compose up -d          # 本地构建
+# 或
+docker compose -f docker-compose.ghcr.yml up -d  # 拉取预构建镜像
+```
+
+> 📖 详细教程: [postgresql/README.md](postgresql/README.md)
+
 ---
 
 ## 常见问题
@@ -470,6 +507,24 @@ docker exec php getent hosts redis
 docker exec php php -m | grep redis
 ```
 
+### Q: PHP 无法连接 PostgreSQL
+
+**A**: 检查以下几点：
+
+```bash
+# 1. 确认 PostgreSQL 容器正在运行
+docker exec postgresql /opt/postgresql/bin/pg_isready -h 127.0.0.1 -p 55432
+
+# 2. 确认 PHP 能解析 PostgreSQL 容器名
+docker exec php getent hosts postgresql
+
+# 3. 确认 PHP pgsql/PDO_pgsql 扩展已加载
+docker exec php php -m | grep -i pgsql
+
+# 4. 确认 PostgreSQL 密码已设置
+docker exec postgresql /opt/postgresql/bin/psql -U postgres -h 127.0.0.1 -p 55432 -c "SELECT 1;"
+```
+
 ### Q: PHP 文件显示源码而不是执行
 
 **A**: 确认站点配置中已包含 PHP 处理：
@@ -493,6 +548,7 @@ docker exec php chmod 755 /www/wwwroot/html
 docker logs nginx
 docker logs php
 docker logs redis
+docker logs postgresql
 ```
 
 常见原因：配置文件语法错误、文件权限不正确、依赖库缺失。
@@ -518,9 +574,10 @@ docker logs redis
 ```
 .github/
 └── workflows/
-    ├── docker-build-push.yml          # Nginx GitHub Actions 构建发布工作流
-    ├── docker-build-push-php.yml      # PHP-FPM GitHub Actions 构建发布工作流
-    └── docker-build-push-redis.yml    # Redis GitHub Actions 构建发布工作流
+    ├── docker-build-push.yml              # Nginx GitHub Actions 构建发布工作流
+    ├── docker-build-push-php.yml          # PHP-FPM GitHub Actions 构建发布工作流
+    ├── docker-build-push-redis.yml        # Redis GitHub Actions 构建发布工作流
+    └── docker-build-push-postgresql.yml   # PostgreSQL GitHub Actions 构建发布工作流
 
 nginx/
 ├── Dockerfile                         # 多阶段 Docker 构建文件
@@ -573,5 +630,17 @@ redis/
 ├── README.md                          # 📖 Redis 详细教程
 ├── conf/                              # Redis 配置文件
 │   └── redis.conf                    # Redis 主配置文件（安全加固，端口 36379）
+└── tests/                             # 验证与测试
+
+postgresql/
+├── Dockerfile                         # 多阶段 Docker 构建文件（源码编译 PostgreSQL）
+├── docker-compose.yml                 # Docker Compose - 本地构建用
+├── docker-compose.ghcr.yml            # Docker Compose - 预构建镜像拉取用
+├── docker-entrypoint.sh               # 容器入口脚本
+├── .dockerignore                      # 构建上下文排除规则
+├── README.md                          # 📖 PostgreSQL 详细教程
+├── conf/                              # PostgreSQL 配置文件
+│   ├── postgresql.conf               # PostgreSQL 主配置文件（安全 + 性能加固，端口 55432）
+│   └── pg_hba.conf                   # 主机认证配置文件（CIS 6.1 合规）
 └── tests/                             # 验证与测试
 ```

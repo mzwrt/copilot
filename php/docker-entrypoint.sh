@@ -24,20 +24,6 @@ done
 # 确保网站目录存在
 mkdir -p /www/wwwroot/html 2>/dev/null || true
 
-# 创建健康检查脚本（检查 PHP-FPM 进程是否运行）
-if [ ! -f /usr/local/bin/php-fpm-healthcheck ]; then
-    cat > /usr/local/bin/php-fpm-healthcheck << 'HEALTHEOF'
-#!/bin/sh
-# 检查 PHP-FPM master 进程是否存在
-if pgrep -x "php-fpm" > /dev/null 2>&1; then
-    exit 0
-else
-    exit 1
-fi
-HEALTHEOF
-    chmod 555 /usr/local/bin/php-fpm-healthcheck
-fi
-
 # PHP-FPM 配置测试
 if [ "$1" = "/opt/php/sbin/php-fpm" ] || [ "$1" = "php-fpm" ]; then
     echo "正在验证 PHP-FPM 配置..."

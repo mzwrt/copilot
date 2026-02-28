@@ -1,0 +1,154 @@
+# =======================================================
+# GitHub Actions 工作流：构建并发布 PostgreSQL Docker 镜像
+# 构建安全加固的 PostgreSQL 镜像并推送到 Docker Hub
+# =======================================================
+#
+# 触发条件：
+#   - 推送到 main 分支且 postgresql/ 目录有变更
+#   - 创建版本标签（v*.*.*）
+#   - 手动触发（workflow_dispatch）
+#
+# 发布地址：
+#   <docker_postgresql_USER>/postgresql:latest
+#   <docker_postgresql_USER>/postgresql:pg-<版本号>
+#
+
+name: Build and Push PostgreSQL Docker Image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'postgresql/**'
+      - '.github/workflows/docker-build-push-postgresql.yml'
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      pg_version:
+        description: 'PostgreSQL 版本号 (留空使用 Dockerfile 默认值)'
+        required: false
+        default: ''
+      platforms:
+        description: '构建平台（多架构）'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+        type: choice
+        options:
+          - 'linux/amd64'
+          - 'linux/arm64'
+          - 'linux/amd64,linux/arm64'
+
+# 确保同一分支不会并发构建
+concurrency:
+  group: docker-build-postgresql-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 镜像名称：<docker_postgresql_USER>/postgresql
+  IMAGE_NAME: ${{ secrets.docker_postgresql_USER }}/postgresql
+
+jobs:
+  build-and-push:
+    name: Build & Push PostgreSQL Docker Image
+    runs-on: ubuntu-latest
+
+    # 授予读取仓库内容权限
+    permissions:
+      contents: read
+
+    steps:
+      # ==========================================
+      # 1. 签出代码
+      # ==========================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ==========================================
+      # 2. 从 Dockerfile 提取版本号（动态获取，避免硬编码）
+      # ==========================================
+      - name: Extract versions from Dockerfile
+        id: versions
+        run: |
+          PG_VER=$(grep -m1 '^ARG PG_VERSION=' postgresql/Dockerfile | cut -d'=' -f2)
+          if [ -z "$PG_VER" ]; then
+            echo "错误：无法从 Dockerfile 提取 PostgreSQL 版本号"
+            exit 1
+          fi
+          echo "pg_version=${PG_VER}" >> "$GITHUB_OUTPUT"
+          echo "Dockerfile PG_VERSION=${PG_VER}"
+
+      # ==========================================
+      # 3. 设置 Docker Buildx（支持多架构构建）
+      # ==========================================
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ==========================================
+      # 4. 设置 QEMU（多架构模拟）
+      # ==========================================
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        if: contains(github.event.inputs.platforms || 'linux/amd64', 'arm64')
+
+      # ==========================================
+      # 5. 登录 Docker Hub
+      # ==========================================
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.docker_postgresql_USER }}
+          password: ${{ secrets.DOCKER_POSTGRESQL_TOKEN }}
+
+      # ==========================================
+      # 6. 提取 Docker 元数据（标签和注释）
+      # ==========================================
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # 版本标签：v1.0.0 → 1.0.0, 1.0, 1
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # main 分支推送 → latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            # 包含 PostgreSQL 版本号（动态从 Dockerfile 获取）
+            type=raw,value=pg-${{ github.event.inputs.pg_version || steps.versions.outputs.pg_version }}
+
+      # ==========================================
+      # 7. 构建并推送 Docker 镜像
+      # ==========================================
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./postgresql
+          file: ./postgresql/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ github.event.inputs.platforms || 'linux/amd64' }}
+          build-args: |
+            PG_VERSION=${{ github.event.inputs.pg_version || steps.versions.outputs.pg_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ==========================================
+      # 8. 输出构建信息
+      # ==========================================
+      - name: Print image info
+        run: |
+          echo "============================================="
+          echo " Docker 镜像构建完成"
+          echo "============================================="
+          echo ""
+          echo "镜像标签:"
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | sed 's/^/  - /'
+          echo ""
+          echo "拉取命令:"
+          echo "  docker pull ${{ env.IMAGE_NAME }}:latest"
+          echo ""
+          echo "运行命令:"
+          echo "  docker run -d --name postgresql ${{ env.IMAGE_NAME }}:latest"
