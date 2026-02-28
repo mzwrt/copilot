@@ -54,7 +54,7 @@ RUN mkdir -p ${REDIS_SRC_DIR} \
 
 # 下载 Redis 源码
 RUN cd ${REDIS_SRC_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz" \
     && tar -zxf "redis-${REDIS_VERSION}.tar.gz" \
     && mv "redis-${REDIS_VERSION}" redis \

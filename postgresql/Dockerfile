@@ -66,7 +66,7 @@ RUN mkdir -p ${PG_SRC_DIR} \
 
 # 下载 PostgreSQL 源码
 RUN cd ${PG_SRC_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
     && tar -jxf "postgresql-${PG_VERSION}.tar.bz2" \
     && mv "postgresql-${PG_VERSION}" postgresql \

@@ -153,7 +153,7 @@ RUN mkdir -p ${PHP_SRC_DIR} \
 
 # 下载 PHP 源码
 RUN cd ${PHP_SRC_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://www.php.net/distributions/php-${PHP_VERSION}.tar.gz" \
     && tar -zxf "php-${PHP_VERSION}.tar.gz" \
     && mv "php-${PHP_VERSION}" php \
