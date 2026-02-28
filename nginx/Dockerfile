@@ -215,7 +215,8 @@ RUN set -eux; \
         ${NGINX_DIR}/nginx/src/http/ngx_http_special_response.c; \
     fi; \
     if [ -n "${NGINX_VERSION_NUMBER}" ]; then \
-      sed -i "s/#define NGINX_VERSION.*\".*\"/#define NGINX_VERSION      \"${NGINX_VERSION_NUMBER}\"/" \
+      safe_version=$(printf '%s' "${NGINX_VERSION_NUMBER}" | sed 's/[&/\\]/\\&/g'); \
+      sed -i "s/#define NGINX_VERSION.*\".*\"/#define NGINX_VERSION      \"${safe_version}\"/" \
         ${NGINX_DIR}/nginx/src/core/nginx.h; \
     fi
 
@@ -436,8 +437,9 @@ LABEL org.opencontainers.image.title="Nginx Custom" \
 
 # 重新声明运行时需要的 ARGs
 ARG USE_modsecurity
-ARG USE_owasp
 ARG USE_modsecurity_nginx
+ARG USE_owasp
+ARG USE_ngx_brotli
 ARG OWASP_CRS_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -479,8 +481,12 @@ RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
 COPY --from=builder /opt/nginx/sbin /opt/nginx/sbin
 COPY --from=builder /opt/nginx/html /opt/nginx/html
 
-# 从编译阶段复制 mime.types（确保运行时可用）
+# 从编译阶段复制 Nginx 自带配置文件（mime.types、fastcgi 相关等）
 COPY --from=builder /opt/nginx/conf/mime.types /opt/nginx/conf/mime.types
+COPY --from=builder /opt/nginx/conf/fastcgi.conf /opt/nginx/conf/fastcgi.conf
+COPY --from=builder /opt/nginx/conf/fastcgi_params /opt/nginx/conf/fastcgi_params
+COPY --from=builder /opt/nginx/conf/uwsgi_params /opt/nginx/conf/uwsgi_params
+COPY --from=builder /opt/nginx/conf/scgi_params /opt/nginx/conf/scgi_params
 
 # 从编译阶段复制 ModSecurity 库文件
 COPY --from=builder /usr/local/modsecurity /usr/local/modsecurity
@@ -524,6 +530,18 @@ COPY conf/proxy.conf ${NGINX_DIR}/conf/proxy.conf
 COPY conf/php/ ${NGINX_DIR}/conf/php/
 RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
     && sed -i '/^\s*daemon\b/d' ${NGINX_DIR}/conf/nginx.conf
+
+# 根据编译选项条件性禁用 nginx.conf 中的模块配置
+# 如果 Brotli 未编译，注释掉 brotli 指令（避免 "unknown directive" 错误）
+RUN if [ "${USE_ngx_brotli}" != "true" ]; then \
+      sed -i '/\[BROTLI_START\]/,/\[BROTLI_END\]/{ /\[BROTLI_START\]/d; /\[BROTLI_END\]/d; s/^/# /; }' \
+        ${NGINX_DIR}/conf/nginx.conf; \
+    fi
+# 如果 ModSecurity 未编译，注释掉 modsecurity 指令
+RUN if [ "${USE_modsecurity_nginx}" != "true" ]; then \
+      sed -i '/\[MODSECURITY_START\]/,/\[MODSECURITY_END\]/{ /\[MODSECURITY_START\]/d; /\[MODSECURITY_END\]/d; s/^/# /; }' \
+        ${NGINX_DIR}/conf/nginx.conf; \
+    fi
 
 # 复制 ModSecurity 配置文件并替换路径占位符
 COPY conf/modsecurity/ ${NGINX_DIR}/conf/modsecurity/
