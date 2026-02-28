@@ -10,6 +10,7 @@ NGINX_DIR="/opt/nginx"
 
 # 确保日志目录存在且可写
 mkdir -p ${NGINX_DIR}/logs 2>/dev/null || true
+mkdir -p ${NGINX_DIR}/logs/modsec_audit 2>/dev/null || true
 touch ${NGINX_DIR}/logs/nginx.pid 2>/dev/null || true
 
 # 确保缓存目录存在且权限正确

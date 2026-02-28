@@ -497,7 +497,6 @@ RUN mkdir -p \
     ${NGINX_DIR}/ssl/default \
     ${NGINX_DIR}/logs \
     ${NGINX_DIR}/modules \
-    ${NGINX_DIR}/src/ModSecurity \
     /www/wwwroot/html \
     /opt/owasp/conf \
     /opt/owasp/owasp-rules/plugins \
@@ -515,46 +514,28 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     && chmod 400 ${NGINX_DIR}/ssl/default/default.key \
     && chmod 600 ${NGINX_DIR}/ssl/default/default.pem
 
-# 下载 Nginx 配置文件
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/nginx.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/nginx.conf" \
-    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
-    # 确保 Docker 环境下 daemon off 不冲突
+# ============================================================
+# 复制本地配置文件（不再从外部下载，所有配置内置于仓库中）
+# ============================================================
+
+# 复制 Nginx 主配置文件并替换路径占位符
+COPY conf/nginx.conf ${NGINX_DIR}/conf/nginx.conf
+COPY conf/proxy.conf ${NGINX_DIR}/conf/proxy.conf
+COPY conf/php/ ${NGINX_DIR}/conf/php/
+RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
     && sed -i '/^\s*daemon\b/d' ${NGINX_DIR}/conf/nginx.conf
 
-# 下载代理优化配置文件
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/proxy.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/proxy.conf" \
-    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/proxy.conf
+# 复制 ModSecurity 配置文件并替换路径占位符
+COPY conf/modsecurity/ ${NGINX_DIR}/conf/modsecurity/
+RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/modsecurity/modsecurity.conf \
+    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/modsecurity/main.conf \
+    && chown -R root:root ${NGINX_DIR}/conf/modsecurity/ \
+    && chmod 600 ${NGINX_DIR}/conf/modsecurity/*.conf
 
-# 下载 PHP 配置文件（为后期开启 PHP 作准备）
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/pathinfo.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/php/pathinfo.conf" \
-    && wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/enable-php-84.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/php/enable-php-84.conf"
+# 创建 ModSecurity 审计日志目录
+RUN mkdir -p ${NGINX_DIR}/logs/modsec_audit
 
-# mime.types 已在上方从编译阶段复制，此处仅作为备用下载
-RUN if [ ! -f ${NGINX_DIR}/conf/mime.types ]; then \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O ${NGINX_DIR}/conf/mime.types \
-        "https://raw.githubusercontent.com/nginx/nginx/master/conf/mime.types" || true; \
-    fi
-
-# 下载 ModSecurity 配置文件（条件执行）
-RUN set -eux; \
-    if [ "${USE_modsecurity}" = "true" ]; then \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/ModSecurity/modsecurity.conf"; \
-      chown root:root ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf; \
-      chmod 600 ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf; \
-    fi
-
-# 下载 OWASP 核心规则集及相关配置（条件执行）
+# 下载 OWASP 核心规则集（条件执行 - 需要从 GitHub 下载规则库）
 RUN set -eux; \
     if [ "${USE_owasp}" = "true" ]; then \
       cd /opt/owasp; \
@@ -573,13 +554,11 @@ RUN set -eux; \
       tar -zxf "coreruleset-${owasp_VERSION}.tar.gz"; \
       mv "coreruleset-${owasp_VERSION_NO_V}" /opt/owasp/owasp-rules; \
       rm -f "coreruleset-${owasp_VERSION}.tar.gz"; \
-      # 下载 crs-setup.conf
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/owasp-rules/crs-setup.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/crs-setup.conf"; \
+      # 使用内置的 crs-setup.conf 覆盖默认配置
+      cp ${NGINX_DIR}/conf/modsecurity/crs-setup.conf /opt/owasp/owasp-rules/crs-setup.conf; \
       # 创建 plugins 目录
       mkdir -p /opt/owasp/owasp-rules/plugins; \
-      # 下载 WordPress 规则排除插件
+      # 下载 WordPress 规则排除插件（可选）
       wget -q --tries=5 --waitretry=2 --no-check-certificate \
         -O /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-before.conf \
         "https://raw.githubusercontent.com/coreruleset/wordpress-rule-exclusions-plugin/master/plugins/wordpress-rule-exclusions-before.conf" || true; \
@@ -595,27 +574,10 @@ RUN set -eux; \
         mv /opt/owasp/owasp-rules/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf.example \
            /opt/owasp/owasp-rules/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf; \
       fi; \
-      # 下载 OWASP 附加配置文件
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/hosts.deny \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/hosts.deny"; \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/hosts.allow \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/hosts.allow"; \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/main.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/main.conf"; \
-      # 下载 WordPress Nginx 拒绝规则
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/nginx-wordpress.conf \
-        "https://gist.githubusercontent.com/nfsarmento/57db5abba08b315b67f174cd178bea88/raw/b0768871c3349fdaf549a24268cb01b2be145a6a/nginx-wordpress.conf" || true; \
     fi
 
-# 下载默认首页
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O /www/wwwroot/html/index.html \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/index.html" \
-    || echo '<html><body><h1>Welcome</h1></body></html>' > /www/wwwroot/html/index.html
+# 复制默认首页
+COPY conf/index.html /www/wwwroot/html/index.html
 
 # 创建 PID 文件
 RUN touch ${NGINX_DIR}/logs/nginx.pid

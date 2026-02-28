@@ -18,3 +18,6 @@ tests/
 
 # 其他 compose 文件
 docker-compose.ghcr.yml
+
+# 部署包目录
+deploy/
