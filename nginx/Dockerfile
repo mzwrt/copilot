@@ -375,6 +375,12 @@ FROM debian:bookworm-slim
 # hadolint ignore=DL4006
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# OCI 镜像标签（用于 GHCR 展示）
+LABEL org.opencontainers.image.title="Nginx Custom" \
+      org.opencontainers.image.description="Security-hardened Nginx with ModSecurity WAF, CIS Benchmark compliant" \
+      org.opencontainers.image.source="https://github.com/mzwrt/copilot" \
+      org.opencontainers.image.licenses="MIT"
+
 # 重新声明运行时需要的 ARGs
 ARG USE_modsecurity
 ARG USE_owasp
@@ -418,6 +424,9 @@ RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
 # 从编译阶段复制 Nginx 二进制文件和默认页面
 COPY --from=builder /opt/nginx/sbin /opt/nginx/sbin
 COPY --from=builder /opt/nginx/html /opt/nginx/html
+
+# 从编译阶段复制 mime.types（确保运行时可用）
+COPY --from=builder /opt/nginx/conf/mime.types /opt/nginx/conf/mime.types
 
 # 从编译阶段复制 ModSecurity 库文件
 COPY --from=builder /usr/local/modsecurity /usr/local/modsecurity
