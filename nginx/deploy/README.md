@@ -13,7 +13,7 @@ git clone https://github.com/ihccc-com/cis-docker-nginx.git
 cd cis-docker-nginx
 
 # 2. 修改 docker-compose.yml 中的 image 地址
-# image: ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+# image: <你的用户名>/nginx:latest
 
 # 3. 启动容器
 docker compose up -d
