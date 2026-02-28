@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =======================================================
-# PHP-FPM Docker 容器安全配置验证脚本
+# Redis Docker 容器安全配置验证脚本
 # 验证 CIS Docker Benchmark 合规性
 # =======================================================
 #
@@ -8,11 +8,11 @@
 #   ./validate.sh [容器名称]
 #
 # 参数：
-#   容器名称  - 要验证的 Docker 容器名称（默认: php）
+#   容器名称  - 要验证的 Docker 容器名称（默认: redis）
 #
 # 示例：
 #   ./validate.sh
-#   ./validate.sh my-php
+#   ./validate.sh my-redis
 #
 
 set -euo pipefail
@@ -21,11 +21,11 @@ set -euo pipefail
 # 全局变量
 # ============================================================
 
-# 容器名称，默认为 "php"
-CONTAINER_NAME="${1:-php}"
+# 容器名称，默认为 "redis"
+CONTAINER_NAME="${1:-redis}"
 
-# PHP 安装目录
-PHP_DIR="/opt/php"
+# Redis 安装目录
+REDIS_DIR="/opt/redis"
 
 # 测试计数器
 PASS_COUNT=0
@@ -194,98 +194,84 @@ test_container() {
 }
 
 # ============================================================
-# PHP-FPM 服务测试
+# Redis 服务测试
 # ============================================================
-test_php_fpm() {
-    section "PHP-FPM 服务测试 (PHP-FPM Service Tests)"
+test_redis() {
+    section "Redis 服务测试 (Redis Service Tests)"
 
-    # 检查 PHP-FPM 进程是否正在运行
-    local php_pid
-    php_pid=$(docker_exec pgrep -x php-fpm) || php_pid=""
-    if [[ -n "${php_pid}" ]]; then
-        pass "PHP-FPM 进程正在运行"
+    # 检查 Redis 进程是否正在运行
+    local redis_pid
+    redis_pid=$(docker_exec pgrep -x redis-server) || redis_pid=""
+    if [[ -n "${redis_pid}" ]]; then
+        pass "Redis 进程正在运行"
     else
-        fail "PHP-FPM 进程未运行"
-        info "后续 PHP-FPM 测试将被跳过"
+        fail "Redis 进程未运行"
+        info "后续 Redis 测试将被跳过"
         return
     fi
 
-    # 检查 PHP-FPM 是否在 36000 端口监听
+    # 检查 Redis 是否在 36379 端口监听
     local port_listen
-    port_listen=$(docker_exec sh -c "ss -tlnp 2>/dev/null | grep ':36000' || netstat -tlnp 2>/dev/null | grep ':36000'") || port_listen=""
+    port_listen=$(docker_exec sh -c "ss -tlnp 2>/dev/null | grep ':36379' || netstat -tlnp 2>/dev/null | grep ':36379'") || port_listen=""
     if [[ -n "${port_listen}" ]]; then
-        pass "PHP-FPM 在端口 36000 正常监听"
+        pass "Redis 在端口 36379 正常监听"
     else
-        # 尝试使用其他方式检查
-        local fpm_conf_listen
-        fpm_conf_listen=$(docker_exec grep -r "^listen" "${PHP_DIR}/etc/php-fpm.d/" 2>/dev/null) || fpm_conf_listen=""
-        if [[ -n "${fpm_conf_listen}" ]]; then
-            info "PHP-FPM 监听配置: ${fpm_conf_listen}"
+        local redis_conf_port
+        redis_conf_port=$(docker_exec grep "^port" "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || redis_conf_port=""
+        if [[ -n "${redis_conf_port}" ]]; then
+            info "Redis 端口配置: ${redis_conf_port}"
         else
-            fail "PHP-FPM 端口 36000 未监听"
+            fail "Redis 端口 36379 未监听"
         fi
     fi
 
-    # 检查 PHP 版本信息
-    local php_version
-    php_version=$(docker_exec php -v 2>/dev/null | head -1) || php_version=""
-    if [[ -n "${php_version}" ]]; then
-        pass "PHP 版本: ${php_version}"
+    # 检查 Redis 版本信息
+    local redis_version
+    redis_version=$(docker_exec ${REDIS_DIR}/bin/redis-server --version 2>/dev/null) || redis_version=""
+    if [[ -n "${redis_version}" ]]; then
+        pass "Redis 版本: ${redis_version}"
     else
-        fail "无法获取 PHP 版本信息"
+        fail "无法获取 Redis 版本信息"
     fi
 
-    # 检查 expose_php 是否关闭（安全）
-    local expose_php
-    expose_php=$(docker_exec php -i 2>/dev/null | grep "^expose_php" | awk '{print $NF}') || expose_php=""
-    if [[ "${expose_php}" == "Off" ]]; then
-        pass "expose_php 已关闭（安全）"
-    elif [[ -n "${expose_php}" ]]; then
-        fail "expose_php 未关闭: ${expose_php}"
+    # 检查密码认证是否配置
+    local requirepass
+    requirepass=$(docker_exec grep "^requirepass" "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || requirepass=""
+    if [[ -n "${requirepass}" ]]; then
+        pass "已配置密码认证 (requirepass)"
     else
-        skip "无法检查 expose_php 配置"
+        info "未配置密码认证（REDIS_PASSWORD 环境变量未设置）"
     fi
 
-    # 检查 disable_functions 是否配置
-    local disable_functions
-    disable_functions=$(docker_exec php -i 2>/dev/null | grep "^disable_functions" | head -1) || disable_functions=""
-    if [[ -n "${disable_functions}" ]] && [[ "${disable_functions}" != *"no value"* ]]; then
-        pass "已配置 disable_functions 安全限制"
+    # 检查 protected-mode 是否启用
+    local protected_mode
+    protected_mode=$(docker_exec grep "^protected-mode" "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || protected_mode=""
+    if echo "${protected_mode}" | grep -q "yes"; then
+        pass "protected-mode 已启用（安全）"
+    elif [[ -n "${protected_mode}" ]]; then
+        fail "protected-mode 未启用: ${protected_mode}"
     else
-        fail "未配置 disable_functions（安全风险）"
+        skip "无法检查 protected-mode 配置"
     fi
 
-    # 检查 allow_url_include 是否关闭
-    local allow_url_include
-    allow_url_include=$(docker_exec php -i 2>/dev/null | grep "^allow_url_include" | awk '{print $NF}') || allow_url_include=""
-    if [[ "${allow_url_include}" == "Off" ]]; then
-        pass "allow_url_include 已关闭（安全）"
-    elif [[ -n "${allow_url_include}" ]]; then
-        fail "allow_url_include 未关闭: ${allow_url_include}"
+    # 检查危险命令是否已重命名
+    local renamed_flushdb renamed_flushall renamed_debug
+    renamed_flushdb=$(docker_exec grep 'rename-command FLUSHDB' "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || renamed_flushdb=""
+    renamed_flushall=$(docker_exec grep 'rename-command FLUSHALL' "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || renamed_flushall=""
+    renamed_debug=$(docker_exec grep 'rename-command DEBUG' "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || renamed_debug=""
+    if [[ -n "${renamed_flushdb}" ]] && [[ -n "${renamed_flushall}" ]] && [[ -n "${renamed_debug}" ]]; then
+        pass "危险命令已重命名/禁用 (FLUSHDB, FLUSHALL, DEBUG)"
     else
-        skip "无法检查 allow_url_include 配置"
+        fail "部分危险命令未重命名"
     fi
 
-    # 检查 OPcache 状态
-    local opcache_enabled
-    opcache_enabled=$(docker_exec php -i 2>/dev/null | grep "opcache.enable =>" | head -1 | awk '{print $NF}') || opcache_enabled=""
-    if [[ "${opcache_enabled}" == "On" ]] || [[ "${opcache_enabled}" == "1" ]]; then
-        pass "OPcache 已启用（性能优化）"
-    elif [[ -n "${opcache_enabled}" ]]; then
-        info "OPcache 未启用: ${opcache_enabled}"
+    # 检查 maxmemory 是否配置
+    local maxmemory
+    maxmemory=$(docker_exec grep "^maxmemory " "${REDIS_DIR}/etc/redis.conf" 2>/dev/null) || maxmemory=""
+    if [[ -n "${maxmemory}" ]]; then
+        pass "已配置内存限制: ${maxmemory}"
     else
-        info "OPcache 模块可能未安装"
-    fi
-
-    # 检查已加载的扩展
-    local extensions
-    extensions=$(docker_exec php -m 2>/dev/null) || extensions=""
-    if [[ -n "${extensions}" ]]; then
-        local ext_count
-        ext_count=$(echo "${extensions}" | grep -v '^\[' | grep -v '^$' | wc -l)
-        pass "已加载 ${ext_count} 个 PHP 扩展"
-    else
-        fail "无法获取 PHP 扩展列表"
+        fail "未配置 maxmemory（安全风险）"
     fi
 }
 
@@ -297,7 +283,7 @@ test_file_permissions() {
 
     # 检查配置文件是否不可被其他用户读取
     local conf_world_readable
-    conf_world_readable=$(docker_exec find "${PHP_DIR}/etc" -type f -perm -o=r 2>/dev/null) || conf_world_readable=""
+    conf_world_readable=$(docker_exec find "${REDIS_DIR}/etc" -type f -perm -o=r 2>/dev/null) || conf_world_readable=""
     if [[ -z "${conf_world_readable}" ]]; then
         pass "配置文件不可被其他用户读取 (CIS)"
     else
@@ -308,7 +294,7 @@ test_file_permissions() {
 
     # 检查日志目录权限
     local log_dir_perms
-    log_dir_perms=$(docker_exec stat -c '%a' "${PHP_DIR}/var/log" 2>/dev/null) || log_dir_perms=""
+    log_dir_perms=$(docker_exec stat -c '%a' "${REDIS_DIR}/var/log" 2>/dev/null) || log_dir_perms=""
     if [[ -n "${log_dir_perms}" ]]; then
         if [[ $((8#${log_dir_perms})) -le $((8#750)) ]]; then
             pass "日志目录权限正确: ${log_dir_perms}"
@@ -319,17 +305,17 @@ test_file_permissions() {
         skip "日志目录不存在，跳过权限检查"
     fi
 
-    # 检查 session 目录权限
-    local session_dir_perms
-    session_dir_perms=$(docker_exec stat -c '%a' "/tmp/php-session" 2>/dev/null) || session_dir_perms=""
-    if [[ -n "${session_dir_perms}" ]]; then
-        if [[ $((8#${session_dir_perms})) -le $((8#700)) ]]; then
-            pass "Session 目录权限正确: ${session_dir_perms}"
+    # 检查数据目录权限
+    local data_dir_perms
+    data_dir_perms=$(docker_exec stat -c '%a' "${REDIS_DIR}/data" 2>/dev/null) || data_dir_perms=""
+    if [[ -n "${data_dir_perms}" ]]; then
+        if [[ $((8#${data_dir_perms})) -le $((8#750)) ]]; then
+            pass "数据目录权限正确: ${data_dir_perms}"
         else
-            fail "Session 目录权限过宽: ${session_dir_perms}，应为 700 或更严格"
+            fail "数据目录权限过宽: ${data_dir_perms}，应为 750 或更严格"
         fi
     else
-        skip "Session 目录不存在，跳过权限检查"
+        skip "数据目录不存在，跳过权限检查"
     fi
 }
 
@@ -360,7 +346,7 @@ print_summary() {
 # ============================================================
 main() {
     echo ""
-    echo -e "${BOLD}PHP-FPM Docker 容器安全配置验证${NC}"
+    echo -e "${BOLD}Redis Docker 容器安全配置验证${NC}"
     echo -e "目标容器: ${BOLD}${CONTAINER_NAME}${NC}"
     echo -e "验证时间: $(date '+%Y-%m-%d %H:%M:%S')"
 
@@ -383,7 +369,7 @@ main() {
 
     # 执行各类测试
     test_container
-    test_php_fpm
+    test_redis
     test_file_permissions
 
     # 打印测试摘要

@@ -1,0 +1,40 @@
+#!/bin/sh
+# =======================================================
+# Redis Docker 入口脚本
+# 负责运行时初始化和权限检查
+# =======================================================
+
+set -e
+
+REDIS_DIR="/opt/redis"
+
+# 确保目录存在且可写
+mkdir -p ${REDIS_DIR}/var/log 2>/dev/null || true
+mkdir -p ${REDIS_DIR}/var/run 2>/dev/null || true
+mkdir -p ${REDIS_DIR}/data 2>/dev/null || true
+touch ${REDIS_DIR}/var/log/redis.log 2>/dev/null || true
+
+# Set Redis password from environment variable
+if [ -n "${REDIS_PASSWORD}" ]; then
+    # Use printf to safely handle special characters in password
+    ESCAPED_PASS=$(printf '%s\n' "${REDIS_PASSWORD}" | sed 's/[&/\]/\\&/g')
+    sed -i '/^# requirepass/a requirepass '"${ESCAPED_PASS}"'' ${REDIS_DIR}/etc/redis.conf
+    echo "Redis password configured from environment variable"
+fi
+
+# 创建健康检查脚本（检查 Redis 进程是否正常响应）
+if [ ! -f /usr/local/bin/redis-healthcheck ]; then
+    cat > /usr/local/bin/redis-healthcheck << 'HEALTHEOF'
+#!/bin/sh
+REDIS_DIR="/opt/redis"
+if [ -n "${REDIS_PASSWORD}" ]; then
+    ${REDIS_DIR}/bin/redis-cli -p 36379 -a "${REDIS_PASSWORD}" --no-auth-warning ping | grep -q PONG
+else
+    ${REDIS_DIR}/bin/redis-cli -p 36379 ping | grep -q PONG
+fi
+HEALTHEOF
+    chmod 555 /usr/local/bin/redis-healthcheck
+fi
+
+# 执行主命令
+exec "$@"

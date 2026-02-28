@@ -1,39 +1,49 @@
 # =======================================================
-# PHP-FPM Docker Compose - 拉取预构建镜像部署
-# 适用于直接使用 GitHub Actions 预构建的镜像
+# Redis Docker Compose - 本地构建（Local Build）
+# 适用于：在本地从源码编译构建 Redis Docker 镜像
 # 符合 CIS Docker Benchmark 安全基准
 # =======================================================
 #
 # 使用方法:
-#   1. 修改下方 image 地址为你的 Docker Hub 镜像地址
-#   2. 启动: docker compose up -d
-#   3. 停止: docker compose down
-#   4. 日志: docker compose logs -f php
+#   docker compose up -d          # 构建并启动
+#   docker compose down            # 停止
+#   docker compose logs -f redis   # 查看日志
+#   docker compose restart redis   # 重启
 #
-# 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
-#   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
+# 仅构建镜像:
+#   docker compose build                                     # 使用默认配置构建
+#   docker compose build --build-arg REDIS_VERSION=7.4.4     # 指定 Redis 版本
 #
-# 如果镜像是公开的（Public），则不需要登录即可拉取
+# 如需使用预构建镜像（GitHub Actions 构建），请使用:
+#   docker compose -f docker-compose.ghcr.yml up -d
 #
 
 services:
-  php:
-    # ================================================================
-    # ⚠️ 请修改为你自己的镜像地址
-    # 格式: <Docker Hub用户名>/php-fpm:latest
-    # ================================================================
-    image: ihccccom/php-fpm:latest
-    container_name: php
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 构建参数（取消注释以自定义）
+      # args:
+      #   REDIS_VERSION: "7.4.4"
+    image: redis:latest
+    container_name: redis
 
-    # 端口映射（通常 PHP-FPM 不需要暴露端口，通过 Docker 网络与 Nginx 通信）
+    # 端口映射（通常 Redis 不需要暴露端口，通过 Docker 网络与 PHP 通信）
     # ports:
-    #   - "36000:36000"
+    #   - "36379:36379"
+
+    # 环境变量
+    environment:
+      # 设置 Redis 密码（取消注释以启用）
+      # REDIS_PASSWORD: "your_secure_password_here"
+      TZ: Asia/Shanghai
 
     # 数据卷（使用命名卷，首次运行自动从镜像初始化）
     volumes:
-      - php-conf:/opt/php/etc                 # PHP 配置文件
-      - php-logs:/opt/php/var/log             # PHP-FPM 日志
-      - wwwroot:/www/wwwroot                  # 网站根目录（与 Nginx 共享）
+      - redis-conf:/opt/redis/etc              # Redis 配置文件
+      - redis-data:/opt/redis/data             # Redis 数据目录
+      - redis-logs:/opt/redis/var/log          # Redis 日志
 
     # ============================================================
     # CIS Docker Benchmark 安全配置
@@ -48,11 +58,12 @@ services:
       - ALL
     cap_add:
       - CHOWN               # 修改文件属主
-      - SETUID              # 切换用户（master→worker）
+      - SETUID              # 切换用户
       - SETGID              # 切换用户组
       - DAC_OVERRIDE        # 文件权限覆盖
 
     # CIS 5.10/5.11 - 资源限制（防止资源耗尽攻击）
+    # 注意：容器内存限制 (2G) 高于 Redis maxmemory (512mb)，为系统开销预留空间
     deploy:
       resources:
         limits:
@@ -72,9 +83,9 @@ services:
       - /tmp:rw,noexec,nosuid,size=256m
       - /run:rw,noexec,nosuid,size=8m
 
-    # CIS 5.26 - 健康检查
+    # CIS 5.26 - 健康检查（已在 Dockerfile 中定义）
     healthcheck:
-      test: ["CMD-SHELL", "php-fpm-healthcheck"]
+      test: ["CMD-SHELL", "redis-healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -86,13 +97,13 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-        tag: "php-fpm"
+        tag: "redis"
 
     # CIS 5.18 - 限制共享内存
     shm_size: "256m"
 
     # 容器主机名
-    hostname: php
+    hostname: redis
 
     # 网络配置
     networks:
@@ -100,12 +111,12 @@ services:
 
 # 命名卷定义
 volumes:
-  php-conf:
-    name: php-conf
-  php-logs:
-    name: php-logs
-  wwwroot:
-    name: wwwroot
+  redis-conf:
+    name: redis-conf
+  redis-data:
+    name: redis-data
+  redis-logs:
+    name: redis-logs
 
 # 网络定义
 networks:

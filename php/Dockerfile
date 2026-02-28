@@ -406,7 +406,7 @@ RUN chmod 500 /docker-entrypoint.sh
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD php-fpm-healthcheck || exit 1
 
-EXPOSE 9000
+EXPOSE 36000
 
 # 优雅停止信号
 STOPSIGNAL SIGQUIT
