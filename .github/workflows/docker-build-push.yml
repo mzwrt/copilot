@@ -28,11 +28,11 @@ on:
       nginx_version:
         description: 'Nginx 版本号'
         required: false
-        default: '1.28.0'
+        default: '1.28.2'
       openssl_version:
         description: 'OpenSSL 版本号'
         required: false
-        default: '3.5.4'
+        default: '3.5.5'
       owasp_crs_version:
         description: 'OWASP CRS 版本 (留空自动获取最新)'
         required: false
