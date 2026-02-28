@@ -3,7 +3,7 @@
 基于 CIS Docker Benchmark、CIS Nginx Benchmark 标准的 Nginx 安全容器化部署方案。
 
 > 📖 本文档为 Docker 使用教程，适用于直接拉取预构建镜像进行部署。
-> 如需了解 GitHub Actions 编译构建流程，请参阅 [编译构建教程](README.md)。
+> 如需了解编译构建流程，请参阅源码仓库：[mzwrt/copilot](https://github.com/mzwrt/copilot)。
 
 ## 目录
 
@@ -28,11 +28,11 @@
 # 1. 创建工作目录
 mkdir nginx-docker && cd nginx-docker
 
-# 2. 下载 docker-compose.ghcr.yml（或从仓库复制）
+# 2. 下载 docker-compose.yml（或从仓库复制）
 # 修改 image 为你的镜像地址
 
 # 3. 启动容器
-docker compose -f docker-compose.ghcr.yml up -d
+docker compose up -d
 
 # 4. 验证
 curl http://localhost/
@@ -52,7 +52,7 @@ cat ~/.dockerhub_token | docker login -u 你的DockerHub用户名 --password-std
 rm ~/.dockerhub_token
 ```
 
-### 步骤 2：配置 docker-compose.ghcr.yml
+### 步骤 2：配置 docker-compose.yml
 
 修改 `image` 为你的镜像地址：
 
@@ -65,13 +65,13 @@ services:
 ### 步骤 3：启动
 
 ```bash
-docker compose -f docker-compose.ghcr.yml up -d
+docker compose up -d
 
 # 查看状态
-docker compose -f docker-compose.ghcr.yml ps
+docker compose ps
 
 # 查看日志
-docker compose -f docker-compose.ghcr.yml logs -f nginx
+docker compose logs -f nginx
 ```
 
 ### 步骤 4：验证
@@ -250,7 +250,7 @@ include /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-config.conf
 
 ### 方式一：通过 Docker 网络连接 PHP-FPM 容器
 
-在 `docker-compose.ghcr.yml` 中添加 PHP-FPM 服务：
+在 `docker-compose.yml` 中添加 PHP-FPM 服务：
 
 ```yaml
 services:
@@ -496,10 +496,10 @@ docker run --rm -v nginx-conf:/data -v $(pwd)/backup:/backup \
 
 ```bash
 # 拉取最新镜像
-docker compose -f docker-compose.ghcr.yml pull
+docker compose pull
 
 # 重新创建容器（卷数据保留）
-docker compose -f docker-compose.ghcr.yml up -d
+docker compose up -d
 ```
 
 ---
@@ -558,5 +558,4 @@ docker exec -it nginx /bin/bash
 | `latest` | 推送到 main 分支 | `nginx:latest` |
 | `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
 | `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
-| `sha-abc1234` | 所有推送 | `nginx:sha-abc1234` |
 | `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |
