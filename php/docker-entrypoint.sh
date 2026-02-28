@@ -42,7 +42,8 @@ fi
 if [ "$1" = "/opt/php/sbin/php-fpm" ] || [ "$1" = "php-fpm" ]; then
     echo "正在验证 PHP-FPM 配置..."
     if ! /opt/php/sbin/php-fpm -t 2>&1; then
-        echo "警告: PHP-FPM 配置验证未通过，请检查配置文件"
+        echo "错误: PHP-FPM 配置验证未通过，请检查配置文件" >&2
+        exit 1
     fi
 fi
 
