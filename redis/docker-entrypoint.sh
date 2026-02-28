@@ -16,9 +16,11 @@ touch ${REDIS_DIR}/var/log/redis.log 2>/dev/null || true
 
 # Set Redis password from environment variable
 if [ -n "${REDIS_PASSWORD}" ]; then
-    # Use printf to safely handle special characters in password
-    ESCAPED_PASS=$(printf '%s\n' "${REDIS_PASSWORD}" | sed 's/[&/\]/\\&/g')
-    sed -i '/^# requirepass/a requirepass '"${ESCAPED_PASS}"'' ${REDIS_DIR}/etc/redis.conf
+    # Use printf to write password directly to a temp file, avoiding sed metacharacter issues
+    printf 'requirepass %s\n' "${REDIS_PASSWORD}" > /tmp/redis_auth.conf
+    # Append to the config after the comment marker
+    sed -i '/^# requirepass/r /tmp/redis_auth.conf' ${REDIS_DIR}/etc/redis.conf
+    rm -f /tmp/redis_auth.conf
     echo "Redis password configured from environment variable"
 fi
 
