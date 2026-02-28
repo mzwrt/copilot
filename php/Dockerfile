@@ -437,6 +437,11 @@ RUN touch ${PHP_DIR}/var/log/php-fpm.log \
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 500 /docker-entrypoint.sh
 
+# 创建健康检查脚本（在构建时创建，避免运行时写入只读文件系统）
+RUN printf '#!/bin/sh\nif pgrep -x "php-fpm" > /dev/null 2>&1; then\n  exit 0\nelse\n  exit 1\nfi\n' \
+    > /usr/local/bin/php-fpm-healthcheck \
+    && chmod 555 /usr/local/bin/php-fpm-healthcheck
+
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD php-fpm-healthcheck || exit 1

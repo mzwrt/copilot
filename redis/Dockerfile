@@ -146,6 +146,11 @@ RUN touch ${REDIS_DIR}/var/log/redis.log \
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 500 /docker-entrypoint.sh
 
+# 创建健康检查脚本（在构建时创建，避免运行时写入只读文件系统）
+RUN printf '#!/bin/sh\nREDIS_DIR="/opt/redis"\nif [ -n "${REDIS_PASSWORD}" ]; then\n  ${REDIS_DIR}/bin/redis-cli -p 36379 -a "${REDIS_PASSWORD}" --no-auth-warning ping | grep -q PONG\nelse\n  ${REDIS_DIR}/bin/redis-cli -p 36379 ping | grep -q PONG\nfi\n' \
+    > /usr/local/bin/redis-healthcheck \
+    && chmod 555 /usr/local/bin/redis-healthcheck
+
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
     CMD redis-healthcheck || exit 1

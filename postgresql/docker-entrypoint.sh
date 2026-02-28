@@ -15,16 +15,6 @@ mkdir -p ${PG_DIR}/var/run 2>/dev/null || true
 mkdir -p ${PGDATA} 2>/dev/null || true
 mkdir -p ${PG_DIR}/wal 2>/dev/null || true
 
-# 创建健康检查脚本
-if [ ! -f /usr/local/bin/pg-healthcheck ]; then
-    cat > /usr/local/bin/pg-healthcheck << 'HEALTHEOF'
-#!/bin/sh
-PG_DIR="/opt/postgresql"
-${PG_DIR}/bin/pg_isready -h 127.0.0.1 -p 55432 -U postgres -q
-HEALTHEOF
-    chmod 555 /usr/local/bin/pg-healthcheck
-fi
-
 # 初始化数据库（仅首次运行时执行）
 if [ ! -f "${PGDATA}/PG_VERSION" ]; then
     echo "Initializing PostgreSQL database..."

@@ -200,6 +200,11 @@ RUN touch ${PG_DIR}/var/log/postgresql.log \
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 500 /docker-entrypoint.sh
 
+# 创建健康检查脚本（在构建时创建，避免运行时写入只读文件系统）
+RUN printf '#!/bin/sh\n/opt/postgresql/bin/pg_isready -h 127.0.0.1 -p 55432 -U postgres -q\n' \
+    > /usr/local/bin/pg-healthcheck \
+    && chmod 555 /usr/local/bin/pg-healthcheck
+
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=30s \
     CMD pg-healthcheck || exit 1
