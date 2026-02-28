@@ -157,8 +157,11 @@ docker exec nginx /opt/nginx/sbin/nginx -s reload
 
 - **HTTP 80** 和 **HTTPS 443** 默认返回 444（拒绝未配置域名的请求）
 - 已启用 Brotli + Gzip 压缩
-- 已启用 ModSecurity WAF
+- 已启用 ModSecurity WAF（OWASP CRS 规则集）
 - 已配置反向代理缓存
+- 已配置 SSL/TLS 安全加固（仅 TLS 1.2/1.3，AEAD 密码套件）
+- 已配置安全响应头（HSTS、CSP、X-Frame-Options 等）
+- 已配置请求速率限制（防暴力破解和 DDoS）
 
 ---
 
