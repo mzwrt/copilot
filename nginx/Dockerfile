@@ -59,10 +59,10 @@ ARG USE_modsecurity_nginx=true
 ###############################################
 
 # Nginx 版本 (必须手动指定)
-ARG NGINX_VERSION=1.28.0
+ARG NGINX_VERSION=1.28.2
 
 # OpenSSL 版本 (必须手动指定)
-ARG OPENSSL_VERSION=3.5.4
+ARG OPENSSL_VERSION=3.5.5
 
 # PCRE2 版本 (留空自动获取最新版, 例如: "pcre2-10.45")
 ARG PCRE2_VERSION=""
@@ -99,10 +99,10 @@ ARG EXTRA_NGINX_MODULES=""
 ###############################################
 
 # 自定义服务器名称 (例如: "OWASP WAF")，留空使用默认值
-ARG NGINX_FAKE_NAME=""
+ARG NGINX_FAKE_NAME="CloudFlare"
 
 # 自定义版本号 (例如: "5.1.24")，留空使用默认版本号
-ARG NGINX_VERSION_NUMBER=""
+ARG NGINX_VERSION_NUMBER="8.2.6"
 
 
 # =======================================================
