@@ -95,8 +95,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     libsystemd0 \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && gosu nobody true
 
 # CIS Docker 4.8 - 移除不必要的 setuid/setgid 权限
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true

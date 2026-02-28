@@ -54,20 +54,27 @@ if [ ! -f "${PGDATA}/PG_VERSION" ]; then
     # 设置 PostgreSQL 超级用户密码
     if [ -n "${POSTGRES_PASSWORD}" ]; then
         gosu postgres ${PG_DIR}/bin/pg_ctl -D "${PGDATA}" -o "-c listen_addresses=''" -w start
-        gosu postgres ${PG_DIR}/bin/psql -U postgres -c "ALTER USER postgres WITH PASSWORD '${POSTGRES_PASSWORD}';"
+
+        # 安全转义函数：防止 SQL 注入
+        # 密码值中的单引号通过双写转义（PostgreSQL SQL 标准转义）
+        ESCAPED_PASSWORD=$(printf '%s' "${POSTGRES_PASSWORD}" | sed "s/'/''/g")
+        gosu postgres ${PG_DIR}/bin/psql -U postgres -c "ALTER USER postgres WITH PASSWORD '${ESCAPED_PASSWORD}';"
         echo "PostgreSQL superuser password configured from environment variable"
 
         # 创建应用数据库和用户（如果指定）
         if [ -n "${POSTGRES_DB}" ] && [ "${POSTGRES_DB}" != "postgres" ]; then
-            gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE DATABASE \"${POSTGRES_DB}\";"
+            # 标识符中的双引号通过双写转义（PostgreSQL 标识符标准转义）
+            ESCAPED_DB=$(printf '%s' "${POSTGRES_DB}" | sed 's/"/""/g')
+            gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE DATABASE \"${ESCAPED_DB}\";"
             echo "Database '${POSTGRES_DB}' created"
         fi
 
         if [ -n "${POSTGRES_USER}" ] && [ "${POSTGRES_USER}" != "postgres" ]; then
-            gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE USER \"${POSTGRES_USER}\" WITH PASSWORD '${POSTGRES_PASSWORD}';"
+            ESCAPED_USER=$(printf '%s' "${POSTGRES_USER}" | sed 's/"/""/g')
+            gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE USER \"${ESCAPED_USER}\" WITH PASSWORD '${ESCAPED_PASSWORD}';"
             if [ -n "${POSTGRES_DB}" ]; then
-                gosu postgres ${PG_DIR}/bin/psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE \"${POSTGRES_DB}\" TO \"${POSTGRES_USER}\";"
-                gosu postgres ${PG_DIR}/bin/psql -U postgres -d "${POSTGRES_DB}" -c "GRANT ALL ON SCHEMA public TO \"${POSTGRES_USER}\";"
+                gosu postgres ${PG_DIR}/bin/psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE \"${ESCAPED_DB}\" TO \"${ESCAPED_USER}\";"
+                gosu postgres ${PG_DIR}/bin/psql -U postgres -d "${POSTGRES_DB}" -c "GRANT ALL ON SCHEMA public TO \"${ESCAPED_USER}\";"
             fi
             echo "User '${POSTGRES_USER}' created and granted privileges"
         fi

@@ -40,5 +40,5 @@ HEALTHEOF
     chmod 555 /usr/local/bin/redis-healthcheck
 fi
 
-# 执行主命令
-exec "$@"
+# 执行主命令（以 redis 用户运行 - CIS Docker 4.1）
+exec gosu redis "$@"
