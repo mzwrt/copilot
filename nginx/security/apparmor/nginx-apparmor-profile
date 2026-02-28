@@ -1,0 +1,55 @@
+#include <tunables/global>
+
+profile docker-nginx flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Deny shell access to prevent container breakout
+  deny /bin/sh mrwklx,
+  deny /bin/bash mrwklx,
+  deny /bin/dash mrwklx,
+
+  # Deny sensitive filesystem access
+  deny /proc/** w,
+  deny /sys/** w,
+  deny /root/** rwklx,
+
+  # Deny dangerous capabilities
+  deny mount,
+  deny umount,
+  deny ptrace,
+  deny network raw,
+
+  # Network access
+  network inet tcp,
+  network inet udp,
+  network inet6 tcp,
+  network inet6 udp,
+
+  # Signal handling
+  signal (send, receive) peer=docker-nginx,
+  signal (receive) peer=unconfined,
+
+  # Nginx binary execution
+  /opt/nginx/sbin/nginx ix,
+
+  # Read-only access for Nginx configuration and resources
+  /opt/nginx/** r,
+  /etc/nginx/** r,
+  /www/wwwroot/** r,
+  /etc/ssl/** r,
+  /etc/resolv.conf r,
+  /etc/hosts r,
+  /etc/nsswitch.conf r,
+  /etc/ld.so.cache r,
+  /lib/** r,
+  /usr/lib/** r,
+
+  # Read/write access for logs, cache, and runtime files
+  /opt/nginx/logs/** rw,
+  /var/cache/nginx/** rw,
+  /var/log/nginx/** rw,
+  /opt/nginx/logs/nginx.pid rw,
+  /run/nginx.pid rw,
+  /dev/null rw,
+  /dev/urandom r,
+}
