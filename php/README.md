@@ -147,8 +147,10 @@ docker logs php
 
 | Secret 名称 | 说明 |
 |-------------|------|
-| `DOCKERHUB_USERNAME` | Docker Hub 用户名 |
-| `DOCKERHUB_TOKEN` | Docker Hub Access Token |
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名（例如 `ihccccom`） |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token（在 Docker Hub → Account Settings → Security 中创建） |
+
+> ⚠️ 三个镜像（Nginx、PHP-FPM、Redis）共用同一组 Secrets，只需配置一次。
 
 #### 步骤 2：触发构建
 
