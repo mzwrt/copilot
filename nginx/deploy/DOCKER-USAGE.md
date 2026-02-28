@@ -276,7 +276,7 @@ services:
 ```nginx
 location ~ [^/]\.php(/|$) {
     try_files $uri =404;
-    fastcgi_pass php-fpm:9000;
+    fastcgi_pass php:36000;
     fastcgi_index index.php;
     include fastcgi.conf;
     include php/pathinfo.conf;

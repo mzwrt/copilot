@@ -54,7 +54,6 @@ nginx/
 ├── docker-compose.yml                 # Docker Compose - 本地构建用
 ├── docker-compose.ghcr.yml            # Docker Compose - 拉取 Docker Hub 预构建镜像用
 ├── docker-entrypoint.sh               # 容器入口脚本（权限检查）
-├── nginx-install.sh                   # 原始裸机安装脚本（参考用）
 ├── .dockerignore                      # 构建上下文排除规则
 ├── README.md                          # 📖 编译构建教程（本文件）
 ├── DOCKER-USAGE.md                    # 📖 Docker 使用教程（可独立发布）

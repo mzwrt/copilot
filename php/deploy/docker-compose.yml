@@ -1,13 +1,14 @@
 # =======================================================
-# Nginx Docker Compose - 拉取预构建镜像（从 Docker Hub）
-# 适用于：直接使用 GitHub Actions 预构建的镜像，无需本地编译
+# PHP-FPM Docker Compose - 拉取预构建镜像部署
+# 适用于直接使用 GitHub Actions 预构建的镜像
+# 符合 CIS Docker Benchmark 安全基准
 # =======================================================
 #
 # 使用方法:
 #   1. 修改下方 image 地址为你的 Docker Hub 镜像地址
-#   2. 启动: docker compose -f docker-compose.ghcr.yml up -d
-#   3. 停止: docker compose -f docker-compose.ghcr.yml down
-#   4. 日志: docker compose -f docker-compose.ghcr.yml logs -f nginx
+#   2. 启动: docker compose up -d
+#   3. 停止: docker compose down
+#   4. 日志: docker compose logs -f php
 #
 # 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
 #   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
@@ -16,29 +17,23 @@
 #
 
 services:
-  nginx:
+  php:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
-    # 格式: <Docker Hub用户名>/nginx:latest
-    # 示例: mzwrt/nginx:latest
+    # 格式: <Docker Hub用户名>/php-fpm:latest
     # ================================================================
-    image: mzwrt/nginx:latest
-    container_name: nginx
+    image: ihccccom/php-fpm:latest
+    container_name: php
 
-    # 端口映射
-    ports:
-      - "80:80"
-      - "443:443"
+    # 端口映射（通常 PHP-FPM 不需要暴露端口，通过 Docker 网络与 Nginx 通信）
+    # ports:
+    #   - "36000:36000"
 
     # 数据卷（使用命名卷，首次运行自动从镜像初始化）
     volumes:
-      - nginx-conf:/opt/nginx/conf            # Nginx 配置文件
-      - nginx-confd:/opt/nginx/conf.d          # 网站配置文件
-      - nginx-ssl:/opt/nginx/ssl               # SSL 证书
-      - nginx-logs:/opt/nginx/logs             # 日志文件
-      - wwwroot:/www/wwwroot                   # 网站根目录
-      - owasp:/opt/owasp                       # OWASP 规则集
-      - nginx-cache:/var/cache/nginx           # Nginx 缓存
+      - php-conf:/opt/php/etc                 # PHP 配置文件
+      - php-logs:/opt/php/var/log             # PHP-FPM 日志
+      - wwwroot:/www/wwwroot                  # 网站根目录（与 Nginx 共享）
 
     # ============================================================
     # CIS Docker Benchmark 安全配置
@@ -52,7 +47,6 @@ services:
     cap_drop:
       - ALL
     cap_add:
-      - NET_BIND_SERVICE    # 绑定低端口 (80/443)
       - CHOWN               # 修改文件属主
       - SETUID              # 切换用户（master→worker）
       - SETGID              # 切换用户组
@@ -75,12 +69,12 @@ services:
     # CIS 5.12 - 只读根文件系统（最小攻击面）
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=64m
+      - /tmp:rw,noexec,nosuid,size=256m
       - /run:rw,noexec,nosuid,size=8m
 
     # CIS 5.26 - 健康检查
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1/nginx-health"]
+      test: ["CMD-SHELL", "php-fpm-healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -92,13 +86,13 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-        tag: "nginx"
+        tag: "php-fpm"
 
     # CIS 5.18 - 限制共享内存
     shm_size: "256m"
 
     # 容器主机名
-    hostname: nginx
+    hostname: php
 
     # 网络配置
     networks:
@@ -106,20 +100,12 @@ services:
 
 # 命名卷定义
 volumes:
-  nginx-conf:
-    name: nginx-conf
-  nginx-confd:
-    name: nginx-confd
-  nginx-ssl:
-    name: nginx-ssl
-  nginx-logs:
-    name: nginx-logs
+  php-conf:
+    name: php-conf
+  php-logs:
+    name: php-logs
   wwwroot:
     name: wwwroot
-  owasp:
-    name: owasp
-  nginx-cache:
-    name: nginx-cache
 
 # 网络定义
 networks:

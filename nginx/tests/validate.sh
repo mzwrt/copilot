@@ -219,9 +219,9 @@ test_nginx() {
         return
     fi
 
-    # 检查 Nginx 是否在 80 端口响应
+    # 检查 Nginx 是否在 80 端口响应（使用健康检查端点）
     local http_code
-    http_code=$(curl -so /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:80/" 2>/dev/null) || http_code=""
+    http_code=$(curl -so /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:80/nginx-health" 2>/dev/null) || http_code=""
     if [[ -n "${http_code}" ]] && [[ "${http_code}" -ge 200 ]] && [[ "${http_code}" -lt 500 ]]; then
         pass "Nginx 在端口 80 正常响应 (HTTP ${http_code})"
     else
