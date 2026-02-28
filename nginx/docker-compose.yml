@@ -26,6 +26,7 @@ services:
       dockerfile: Dockerfile
       # 构建参数（取消注释以自定义）
       # args:
+      #   # === 插件开关 ===
       #   USE_ngx_fancyindex: "false"
       #   USE_PCRE2: "true"
       #   USE_ngx_cache_purge: "true"
@@ -36,9 +37,21 @@ services:
       #   USE_modsecurity: "true"
       #   USE_owasp: "true"
       #   USE_modsecurity_nginx: "true"
-      #   OPENSSL_VERSION: "3.5.4"
+      #   # === 版本配置（留空自动获取最新版）===
       #   NGINX_VERSION: "1.28.0"
+      #   OPENSSL_VERSION: "3.5.4"
+      #   PCRE2_VERSION: ""
+      #   FANCYINDEX_VERSION: "0.5.2"
+      #   NGX_CACHE_PURGE_VERSION: ""
+      #   HEADERS_MORE_VERSION: ""
+      #   PROXY_CONNECT_VERSION: ""
+      #   MODSECURITY_NGINX_VERSION: ""
+      #   OWASP_CRS_VERSION: ""
+      #   # === 自定义模块 ===
+      #   EXTRA_NGINX_MODULES: "--add-module=/path/to/module"
+      #   # === 伪装配置 ===
       #   NGINX_FAKE_NAME: "OWASP WAF"
+      #   NGINX_VERSION_NUMBER: "5.1.24"
     image: nginx-custom:latest
     container_name: nginx
 

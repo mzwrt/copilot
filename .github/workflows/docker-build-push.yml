@@ -34,6 +34,10 @@ on:
         description: 'OpenSSL 版本号'
         required: false
         default: '3.5.4'
+      owasp_crs_version:
+        description: 'OWASP CRS 版本 (留空自动获取最新)'
+        required: false
+        default: ''
       use_modsecurity:
         description: '启用 ModSecurity WAF'
         required: false
@@ -50,6 +54,10 @@ on:
         options:
           - 'true'
           - 'false'
+      extra_nginx_modules:
+        description: '额外 Nginx 模块 (如: --add-module=/path/to/mod)'
+        required: false
+        default: ''
       platforms:
         description: '构建平台（多架构）'
         required: false
@@ -149,6 +157,8 @@ jobs:
             USE_modsecurity=${{ github.event.inputs.use_modsecurity || 'true' }}
             USE_owasp=${{ github.event.inputs.use_owasp || 'true' }}
             USE_modsecurity_nginx=${{ github.event.inputs.use_modsecurity || 'true' }}
+            OWASP_CRS_VERSION=${{ github.event.inputs.owasp_crs_version || '' }}
+            EXTRA_NGINX_MODULES=${{ github.event.inputs.extra_nginx_modules || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

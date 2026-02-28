@@ -436,11 +436,10 @@ docker exec -it nginx /bin/bash
 
 ## 构建参数
 
+### 插件开关
+
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_VERSION` | `1.28.0` | Nginx 版本号 |
-| `OPENSSL_VERSION` | `3.5.4` | OpenSSL 版本号 |
-| `FANCYINDEX_VERSION` | `0.5.2` | ngx-fancyindex 版本号 |
 | `USE_modsecurity` | `true` | 启用 ModSecurity WAF |
 | `USE_owasp` | `true` | 启用 OWASP CRS 规则集 |
 | `USE_modsecurity_nginx` | `true` | 启用 ModSecurity-Nginx 连接器 |
@@ -451,9 +450,29 @@ docker exec -it nginx /bin/bash
 | `USE_ngx_http_headers_more_filter_module` | `true` | 启用自定义响应头模块 |
 | `USE_ngx_http_proxy_connect_module` | `true` | 启用正向代理 CONNECT 模块 |
 | `USE_ngx_fancyindex` | `false` | 启用美化目录浏览模块 |
+
+### 版本配置（留空自动获取最新版）
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `NGINX_VERSION` | `1.28.0` | Nginx 版本号（必须指定） |
+| `OPENSSL_VERSION` | `3.5.4` | OpenSSL 版本号（必须指定） |
+| `PCRE2_VERSION` | `""` | PCRE2 版本，留空自动获取最新版 |
+| `FANCYINDEX_VERSION` | `0.5.2` | ngx-fancyindex 版本号 |
+| `NGX_CACHE_PURGE_VERSION` | `""` | ngx_cache_purge 版本，留空自动获取 |
+| `HEADERS_MORE_VERSION` | `""` | headers-more 版本，留空自动获取 |
+| `PROXY_CONNECT_VERSION` | `""` | proxy_connect 版本，留空自动获取 |
+| `MODSECURITY_NGINX_VERSION` | `""` | ModSecurity-nginx 版本，留空使用最新 |
+| `OWASP_CRS_VERSION` | `""` | OWASP CRS 版本，留空自动获取最新 |
+
+### 其他配置
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
 | `NGINX_FAKE_NAME` | `""` | 自定义服务器名称（伪装） |
-| `NGINX_VERSION_NUMBER` | `""` | 自定义版本号（伪装） |
-| `EXTRA_CC_OPT` | `""` | 额外编译选项 |
+| `NGINX_VERSION_NUMBER` | `""` | 自定义版本号（伪装 nginx.h 中的版本） |
+| `EXTRA_CC_OPT` | `""` | 额外 C 编译选项 |
+| `EXTRA_NGINX_MODULES` | `""` | 额外 Nginx 模块参数（如 `--add-module=/path/to/mod`） |
 
 **自定义构建示例**：
 
@@ -464,11 +483,14 @@ docker build -t nginx-custom:latest ./nginx/
 # 禁用 ModSecurity
 docker build --build-arg USE_modsecurity=false -t nginx-custom:latest ./nginx/
 
-# 自定义服务器名称
-docker build --build-arg NGINX_FAKE_NAME="MyServer" -t nginx-custom:latest ./nginx/
+# 自定义服务器名称和伪装版本号
+docker build --build-arg NGINX_FAKE_NAME="MyServer" --build-arg NGINX_VERSION_NUMBER="5.1.24" -t nginx-custom:latest ./nginx/
 
-# 指定 Nginx 版本
-docker build --build-arg NGINX_VERSION=1.28.0 -t nginx-custom:latest ./nginx/
+# 指定特定插件版本
+docker build --build-arg HEADERS_MORE_VERSION="0.37" --build-arg OWASP_CRS_VERSION="v4.7.0" -t nginx-custom:latest ./nginx/
+
+# 添加额外自定义模块
+docker build --build-arg EXTRA_NGINX_MODULES="--add-module=/opt/nginx/src/my_module" -t nginx-custom:latest ./nginx/
 ```
 
 ## 卷挂载说明
