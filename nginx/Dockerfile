@@ -22,58 +22,76 @@
 ###############################################
 
 # ngx-fancyindex 美化目录浏览模块
-# 设置为 "true" 即启用
 ARG USE_ngx_fancyindex=false
 
 # PCRE2 正则表达式模块
-# 设置为 "false" 即不启用
 ARG USE_PCRE2=true
 
 # ngx_cache_purge 缓存清除模块
-# 设置为 "false" 即不启用
 ARG USE_ngx_cache_purge=true
 
 # ngx_http_headers_more_filter_module 自定义响应头模块
-# 设置为 "false" 即不启用
 ARG USE_ngx_http_headers_more_filter_module=true
 
 # ngx_http_proxy_connect_module 正向代理 CONNECT 模块
-# 设置为 "false" 即不启用
 ARG USE_ngx_http_proxy_connect_module=true
 
 # ngx_brotli 压缩模块
-# 设置为 "false" 即不启用
 ARG USE_ngx_brotli=true
 
 # openssl 使用自编译 OpenSSL（高版本/高性能）
-# 设置为 "false" 即不启用
 ARG USE_openssl=true
 
 # modsecurity Web 应用防火墙引擎
-# 设置为 "false" 即不启用
 ARG USE_modsecurity=true
 
 # OWASP 核心规则集
-# 设置为 "false" 即不启用
 ARG USE_owasp=true
 
 # modsecurity-nginx 连接器模块
-# 设置为 "false" 即不启用
 ARG USE_modsecurity_nginx=true
 
 ###############################################
 # 版本配置 (Version Configuration)
+# 留空 "" 表示自动获取最新版本
+# 填写具体版本号表示使用指定版本
 # 构建时可通过 --build-arg 覆盖
 ###############################################
 
-# OpenSSL 版本 (手动指定)
-ARG OPENSSL_VERSION=3.5.4
-
-# Nginx 版本 (手动指定)
+# Nginx 版本 (必须手动指定)
 ARG NGINX_VERSION=1.28.0
 
-# ngx-fancyindex 版本
+# OpenSSL 版本 (必须手动指定)
+ARG OPENSSL_VERSION=3.5.4
+
+# PCRE2 版本 (留空自动获取最新版, 例如: "pcre2-10.45")
+ARG PCRE2_VERSION=""
+
+# ngx-fancyindex 版本 (留空自动获取最新版, 例如: "0.5.2")
 ARG FANCYINDEX_VERSION=0.5.2
+
+# ngx_cache_purge 版本 (留空自动获取最新版, 例如: "2.3")
+ARG NGX_CACHE_PURGE_VERSION=""
+
+# headers-more-nginx-module 版本 (留空自动获取最新版, 例如: "0.38")
+ARG HEADERS_MORE_VERSION=""
+
+# ngx_http_proxy_connect_module 版本 (留空自动获取最新版, 例如: "v0.0.7")
+ARG PROXY_CONNECT_VERSION=""
+
+# ModSecurity-nginx 连接器版本 (留空使用最新版, 例如: "v1.0.3")
+ARG MODSECURITY_NGINX_VERSION=""
+
+# OWASP CRS 规则集版本 (留空自动获取最新版, 例如: "v4.8.0")
+ARG OWASP_CRS_VERSION=""
+
+###############################################
+# 自定义模块入口 (Extra Nginx Modules)
+# 可添加额外的 --add-module 或 --add-dynamic-module 参数
+# 多个模块用空格分隔
+# 示例: "--add-module=/path/to/module1 --add-module=/path/to/module2"
+###############################################
+ARG EXTRA_NGINX_MODULES=""
 
 ###############################################
 # Nginx 伪装配置 (Server Identity)
@@ -109,7 +127,14 @@ ARG USE_owasp
 ARG USE_modsecurity_nginx
 ARG OPENSSL_VERSION
 ARG NGINX_VERSION
+ARG PCRE2_VERSION
 ARG FANCYINDEX_VERSION
+ARG NGX_CACHE_PURGE_VERSION
+ARG HEADERS_MORE_VERSION
+ARG PROXY_CONNECT_VERSION
+ARG MODSECURITY_NGINX_VERSION
+ARG OWASP_CRS_VERSION
+ARG EXTRA_NGINX_MODULES
 ARG NGINX_FAKE_NAME
 ARG NGINX_VERSION_NUMBER
 
@@ -175,7 +200,7 @@ RUN cd ${NGINX_DIR} \
 # 应用 Nginx 伪装名称补丁（隐藏服务器标识，CIS 合规）
 RUN set -eux; \
     if [ -n "${NGINX_FAKE_NAME}" ]; then \
-      safe_name=$(printf '%s' "${NGINX_FAKE_NAME}" | sed 's/[&/\]/\\&/g'); \
+      safe_name=$(printf '%s' "${NGINX_FAKE_NAME}" | sed 's/[&/\\]/\\&/g'); \
       sed -i "s/static u_char ngx_http_server_string\[\] = \"Server: nginx\" CRLF;/static u_char ngx_http_server_string\[\] = \"Server: ${safe_name}\" CRLF;/g" \
         ${NGINX_DIR}/nginx/src/http/ngx_http_header_filter_module.c; \
       sed -i "s/static u_char ngx_http_server_full_string\[\] = \"Server: \" NGINX_VER CRLF;/static u_char ngx_http_server_full_string\[\] = \"Server: ${safe_name}\" CRLF;/g" \
@@ -188,16 +213,25 @@ RUN set -eux; \
         ${NGINX_DIR}/nginx/src/http/ngx_http_special_response.c; \
       sed -i "s/<hr><center>\" NGINX_VER \"<\/center>\" CRLF/<hr><center>${safe_name}<\/center>\" CRLF/" \
         ${NGINX_DIR}/nginx/src/http/ngx_http_special_response.c; \
+    fi; \
+    if [ -n "${NGINX_VERSION_NUMBER}" ]; then \
+      safe_version=$(printf '%s' "${NGINX_VERSION_NUMBER}" | sed 's/[&/\\]/\\&/g'); \
+      sed -i "s/#define NGINX_VERSION.*\".*\"/#define NGINX_VERSION      \"${safe_version}\"/" \
+        ${NGINX_DIR}/nginx/src/core/nginx.h; \
     fi
 
 # 下载 PCRE2 模块
 RUN set -eux; \
     if [ "${USE_PCRE2}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      pcre2_version=$(curl -sSL --retry 5 --retry-delay 2 --retry-connrefused \
-        "https://api.github.com/repos/PhilipHazel/pcre2/releases/latest" \
-        | grep -oP '"tag_name":\s*"\K[^"]+') || true; \
-      if [ -z "$pcre2_version" ]; then pcre2_version="pcre2-10.45"; fi; \
+      if [ -n "${PCRE2_VERSION}" ]; then \
+        pcre2_version="${PCRE2_VERSION}"; \
+      else \
+        pcre2_version=$(curl -sSL --retry 5 --retry-delay 2 --retry-connrefused \
+          "https://api.github.com/repos/PhilipHazel/pcre2/releases/latest" \
+          | grep -oP '"tag_name":\s*"\K[^"]+') || true; \
+        if [ -z "$pcre2_version" ]; then pcre2_version="pcre2-10.45"; fi; \
+      fi; \
       wget --tries=5 --waitretry=2 --no-check-certificate \
         "https://github.com/PhilipHazel/pcre2/releases/download/$pcre2_version/$pcre2_version.tar.gz"; \
       tar -zxf "$pcre2_version.tar.gz"; \
@@ -229,25 +263,33 @@ RUN set -eux; \
 RUN set -eux; \
     if [ "${USE_ngx_cache_purge}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      ngx_cache_purge_version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
-        "https://api.github.com/repos/FRiCKLE/ngx_cache_purge/tags" \
-        | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
-      if [ -z "$ngx_cache_purge_version" ]; then ngx_cache_purge_version="2.3"; fi; \
+      if [ -n "${NGX_CACHE_PURGE_VERSION}" ]; then \
+        version="${NGX_CACHE_PURGE_VERSION}"; \
+      else \
+        version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
+          "https://api.github.com/repos/FRiCKLE/ngx_cache_purge/tags" \
+          | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
+        if [ -z "$version" ]; then version="2.3"; fi; \
+      fi; \
       wget --tries=5 --waitretry=2 --no-check-certificate \
-        "https://github.com/FRiCKLE/ngx_cache_purge/archive/refs/tags/$ngx_cache_purge_version.zip"; \
-      unzip "$ngx_cache_purge_version.zip"; \
-      mv "ngx_cache_purge-$ngx_cache_purge_version" ngx_cache_purge; \
-      rm -f "$ngx_cache_purge_version.zip"; \
+        "https://github.com/FRiCKLE/ngx_cache_purge/archive/refs/tags/$version.zip"; \
+      unzip "$version.zip"; \
+      mv "ngx_cache_purge-$version" ngx_cache_purge; \
+      rm -f "$version.zip"; \
     fi
 
 # 下载 ngx_http_headers_more_filter_module 自定义响应头模块
 RUN set -eux; \
     if [ "${USE_ngx_http_headers_more_filter_module}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
-        "https://api.github.com/repos/openresty/headers-more-nginx-module/tags" \
-        | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4 | sed 's/^v//') || true; \
-      if [ -z "$version" ]; then version="0.38"; fi; \
+      if [ -n "${HEADERS_MORE_VERSION}" ]; then \
+        version="${HEADERS_MORE_VERSION}"; \
+      else \
+        version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
+          "https://api.github.com/repos/openresty/headers-more-nginx-module/tags" \
+          | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4 | sed 's/^v//') || true; \
+        if [ -z "$version" ]; then version="0.38"; fi; \
+      fi; \
       wget --tries=5 --waitretry=2 --no-check-certificate \
         "https://github.com/openresty/headers-more-nginx-module/archive/refs/tags/v${version}.tar.gz"; \
       tar -xzf "v${version}.tar.gz"; \
@@ -259,10 +301,14 @@ RUN set -eux; \
 RUN set -eux; \
     if [ "${USE_ngx_http_proxy_connect_module}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
-        "https://api.github.com/repos/chobits/ngx_http_proxy_connect_module/tags" \
-        | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
-      if [ -z "$version" ]; then echo "错误：无法获取 ngx_http_proxy_connect_module 版本"; exit 1; fi; \
+      if [ -n "${PROXY_CONNECT_VERSION}" ]; then \
+        version="${PROXY_CONNECT_VERSION}"; \
+      else \
+        version=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
+          "https://api.github.com/repos/chobits/ngx_http_proxy_connect_module/tags" \
+          | grep -o '"name": "[^"]*' | head -n 1 | cut -d '"' -f 4) || true; \
+        if [ -z "$version" ]; then echo "错误：无法获取 ngx_http_proxy_connect_module 版本"; exit 1; fi; \
+      fi; \
       wget --tries=5 --waitretry=2 --no-check-certificate \
         "https://github.com/chobits/ngx_http_proxy_connect_module/archive/refs/tags/$version.zip"; \
       unzip "$version.zip"; \
@@ -305,7 +351,12 @@ RUN set -eux; \
 RUN set -eux; \
     if [ "${USE_modsecurity_nginx}" = "true" ]; then \
       cd ${NGINX_SRC_DIR}; \
-      git clone --depth 1 https://github.com/owasp-modsecurity/ModSecurity-nginx.git; \
+      if [ -n "${MODSECURITY_NGINX_VERSION}" ]; then \
+        git clone --depth 1 -b "${MODSECURITY_NGINX_VERSION}" \
+          https://github.com/owasp-modsecurity/ModSecurity-nginx.git; \
+      else \
+        git clone --depth 1 https://github.com/owasp-modsecurity/ModSecurity-nginx.git; \
+      fi; \
       chown -R root:root ${NGINX_SRC_DIR}/ModSecurity-nginx; \
     fi
 
@@ -335,6 +386,9 @@ RUN set -eux; \
       EXTRA_ARGS="$EXTRA_ARGS --with-pcre=${NGINX_SRC_DIR}/pcre2" || true; \
     [ "${USE_ngx_fancyindex}" = "true" ] && \
       EXTRA_ARGS="$EXTRA_ARGS --add-module=${NGINX_SRC_DIR}/ngx_fancyindex" || true; \
+    if [ -n "${EXTRA_NGINX_MODULES}" ]; then \
+      EXTRA_ARGS="$EXTRA_ARGS ${EXTRA_NGINX_MODULES}"; \
+    fi; \
     ./configure \
       --prefix=${NGINX_DIR} \
       --user=www-data \
@@ -375,10 +429,18 @@ FROM debian:bookworm-slim
 # hadolint ignore=DL4006
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# OCI 镜像标签（用于 GHCR 展示）
+LABEL org.opencontainers.image.title="Nginx Custom" \
+      org.opencontainers.image.description="Security-hardened Nginx with ModSecurity WAF, CIS Benchmark compliant" \
+      org.opencontainers.image.source="https://github.com/mzwrt/copilot" \
+      org.opencontainers.image.licenses="MIT"
+
 # 重新声明运行时需要的 ARGs
 ARG USE_modsecurity
-ARG USE_owasp
 ARG USE_modsecurity_nginx
+ARG USE_owasp
+ARG USE_ngx_brotli
+ARG OWASP_CRS_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
     OPT_DIR=/opt \
@@ -419,6 +481,13 @@ RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
 COPY --from=builder /opt/nginx/sbin /opt/nginx/sbin
 COPY --from=builder /opt/nginx/html /opt/nginx/html
 
+# 从编译阶段复制 Nginx 自带配置文件（mime.types、fastcgi 相关等）
+COPY --from=builder /opt/nginx/conf/mime.types /opt/nginx/conf/mime.types
+COPY --from=builder /opt/nginx/conf/fastcgi.conf /opt/nginx/conf/fastcgi.conf
+COPY --from=builder /opt/nginx/conf/fastcgi_params /opt/nginx/conf/fastcgi_params
+COPY --from=builder /opt/nginx/conf/uwsgi_params /opt/nginx/conf/uwsgi_params
+COPY --from=builder /opt/nginx/conf/scgi_params /opt/nginx/conf/scgi_params
+
 # 从编译阶段复制 ModSecurity 库文件
 COPY --from=builder /usr/local/modsecurity /usr/local/modsecurity
 
@@ -434,7 +503,6 @@ RUN mkdir -p \
     ${NGINX_DIR}/ssl/default \
     ${NGINX_DIR}/logs \
     ${NGINX_DIR}/modules \
-    ${NGINX_DIR}/src/ModSecurity \
     /www/wwwroot/html \
     /opt/owasp/conf \
     /opt/owasp/owasp-rules/plugins \
@@ -452,68 +520,63 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     && chmod 400 ${NGINX_DIR}/ssl/default/default.key \
     && chmod 600 ${NGINX_DIR}/ssl/default/default.pem
 
-# 下载 Nginx 配置文件
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/nginx.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/nginx.conf" \
-    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
-    # 确保 Docker 环境下 daemon off 不冲突
+# ============================================================
+# 复制本地配置文件（不再从外部下载，所有配置内置于仓库中）
+# ============================================================
+
+# 复制 Nginx 主配置文件并替换路径占位符
+COPY conf/nginx.conf ${NGINX_DIR}/conf/nginx.conf
+COPY conf/proxy.conf ${NGINX_DIR}/conf/proxy.conf
+COPY conf/php/ ${NGINX_DIR}/conf/php/
+RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
     && sed -i '/^\s*daemon\b/d' ${NGINX_DIR}/conf/nginx.conf
 
-# 下载代理优化配置文件
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/proxy.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/proxy.conf" \
-    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/proxy.conf
-
-# 下载 PHP 配置文件（为后期开启 PHP 作准备）
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/pathinfo.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/php/pathinfo.conf" \
-    && wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O ${NGINX_DIR}/conf/enable-php-84.conf \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/php/enable-php-84.conf"
-
-# 下载 Nginx mime.types 配置（如果远程 nginx.conf 需要）
-RUN if [ ! -f ${NGINX_DIR}/conf/mime.types ]; then \
-      cp /opt/nginx/html/../conf/mime.types ${NGINX_DIR}/conf/mime.types 2>/dev/null || \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O ${NGINX_DIR}/conf/mime.types \
-        "https://raw.githubusercontent.com/nginx/nginx/master/conf/mime.types" || true; \
+# 根据编译选项条件性禁用 nginx.conf 中的模块配置
+# 如果 Brotli 未编译，注释掉 brotli 指令（避免 "unknown directive" 错误）
+RUN if [ "${USE_ngx_brotli}" != "true" ]; then \
+      sed -i '/\[BROTLI_START\]/,/\[BROTLI_END\]/{ /\[BROTLI_START\]/d; /\[BROTLI_END\]/d; s/^/# /; }' \
+        ${NGINX_DIR}/conf/nginx.conf; \
+    fi
+# 如果 ModSecurity 未编译，注释掉 modsecurity 指令
+RUN if [ "${USE_modsecurity_nginx}" != "true" ]; then \
+      sed -i '/\[MODSECURITY_START\]/,/\[MODSECURITY_END\]/{ /\[MODSECURITY_START\]/d; /\[MODSECURITY_END\]/d; s/^/# /; }' \
+        ${NGINX_DIR}/conf/nginx.conf; \
     fi
 
-# 下载 ModSecurity 配置文件（条件执行）
-RUN set -eux; \
-    if [ "${USE_modsecurity}" = "true" ]; then \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/ModSecurity/modsecurity.conf"; \
-      chown root:root ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf; \
-      chmod 600 ${NGINX_SRC_DIR}/ModSecurity/modsecurity.conf; \
-    fi
+# 复制 ModSecurity 配置文件并替换路径占位符
+COPY conf/modsecurity/ ${NGINX_DIR}/conf/modsecurity/
+RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/modsecurity/modsecurity.conf \
+    && sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/modsecurity/main.conf \
+    && chown -R root:root ${NGINX_DIR}/conf/modsecurity/ \
+    && chmod 600 ${NGINX_DIR}/conf/modsecurity/*.conf
 
-# 下载 OWASP 核心规则集及相关配置（条件执行）
+# 创建 ModSecurity 审计日志目录
+RUN mkdir -p ${NGINX_DIR}/logs/modsec_audit
+
+# 下载 OWASP 核心规则集（条件执行 - 需要从 GitHub 下载规则库）
 RUN set -eux; \
     if [ "${USE_owasp}" = "true" ]; then \
       cd /opt/owasp; \
-      owasp_VERSION=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
-        "https://api.github.com/repos/coreruleset/coreruleset/releases/latest" \
-        | grep -Po '"tag_name": "\K.*?(?=")') || true; \
-      if [ -z "$owasp_VERSION" ]; then owasp_VERSION="v4.8.0"; fi; \
-      owasp_VERSION_NO_V=$(echo "$owasp_VERSION" | sed 's/v//g'); \
-      owasp_DOWNLOAD_URL="https://github.com/coreruleset/coreruleset/archive/refs/tags/$owasp_VERSION.tar.gz"; \
+      if [ -n "${OWASP_CRS_VERSION}" ]; then \
+        owasp_VERSION="${OWASP_CRS_VERSION}"; \
+      else \
+        owasp_VERSION=$(curl -s --retry 5 --retry-delay 2 --retry-connrefused \
+          "https://api.github.com/repos/coreruleset/coreruleset/releases/latest" \
+          | grep -Po '"tag_name": "\K.*?(?=")') || true; \
+        if [ -z "$owasp_VERSION" ]; then owasp_VERSION="v4.8.0"; fi; \
+      fi; \
+      owasp_VERSION_NO_V=$(echo "$owasp_VERSION" | sed 's/^v//'); \
+      owasp_DOWNLOAD_URL="https://github.com/coreruleset/coreruleset/archive/refs/tags/${owasp_VERSION}.tar.gz"; \
       curl -L --retry 5 --retry-delay 2 --retry-connrefused \
-        -o "coreruleset-$owasp_VERSION.tar.gz" "$owasp_DOWNLOAD_URL"; \
-      tar -zxf "coreruleset-$owasp_VERSION.tar.gz"; \
-      mv "coreruleset-$owasp_VERSION_NO_V" /opt/owasp/owasp-rules; \
-      rm -f "coreruleset-$owasp_VERSION.tar.gz"; \
-      # 下载 crs-setup.conf
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/owasp-rules/crs-setup.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/crs-setup.conf"; \
+        -o "coreruleset-${owasp_VERSION}.tar.gz" "$owasp_DOWNLOAD_URL"; \
+      tar -zxf "coreruleset-${owasp_VERSION}.tar.gz"; \
+      mv "coreruleset-${owasp_VERSION_NO_V}" /opt/owasp/owasp-rules; \
+      rm -f "coreruleset-${owasp_VERSION}.tar.gz"; \
+      # 使用内置的 crs-setup.conf 覆盖默认配置
+      cp ${NGINX_DIR}/conf/modsecurity/crs-setup.conf /opt/owasp/owasp-rules/crs-setup.conf; \
       # 创建 plugins 目录
       mkdir -p /opt/owasp/owasp-rules/plugins; \
-      # 下载 WordPress 规则排除插件
+      # 下载 WordPress 规则排除插件（可选）
       wget -q --tries=5 --waitretry=2 --no-check-certificate \
         -O /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-before.conf \
         "https://raw.githubusercontent.com/coreruleset/wordpress-rule-exclusions-plugin/master/plugins/wordpress-rule-exclusions-before.conf" || true; \
@@ -529,27 +592,10 @@ RUN set -eux; \
         mv /opt/owasp/owasp-rules/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf.example \
            /opt/owasp/owasp-rules/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf; \
       fi; \
-      # 下载 OWASP 附加配置文件
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/hosts.deny \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/hosts.deny"; \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/hosts.allow \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/hosts.allow"; \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/main.conf \
-        "https://raw.githubusercontent.com/mzwrt/system_script/main/nginx/ModSecurity/main.conf"; \
-      # 下载 WordPress Nginx 拒绝规则
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/conf/nginx-wordpress.conf \
-        "https://gist.githubusercontent.com/nfsarmento/57db5abba08b315b67f174cd178bea88/raw/b0768871c3349fdaf549a24268cb01b2be145a6a/nginx-wordpress.conf" || true; \
     fi
 
-# 下载默认首页
-RUN wget -q --tries=5 --waitretry=2 --no-check-certificate \
-      -O /www/wwwroot/html/index.html \
-      "https://raw.githubusercontent.com/mzwrt/system_script/refs/heads/main/nginx/index.html" \
-    || echo '<html><body><h1>Welcome</h1></body></html>' > /www/wwwroot/html/index.html
+# 复制默认首页
+COPY conf/index.html /www/wwwroot/html/index.html
 
 # 创建 PID 文件
 RUN touch ${NGINX_DIR}/logs/nginx.pid
