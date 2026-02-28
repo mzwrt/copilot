@@ -55,7 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libicu-dev \
     liblz4-dev \
     libzstd-dev \
-    python3-dev \
     bison \
     flex \
     && rm -rf /var/lib/apt/lists/*
@@ -91,7 +90,6 @@ RUN set -eux; \
         --with-zstd \
         --with-readline \
         --with-system-tzdata=/usr/share/zoneinfo \
-        --enable-debug=no \
     ; \
     make -j$(nproc) world-bin; \
     make install-world-bin
@@ -136,15 +134,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblz4-1 \
     libzstd1 \
     locales \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && gosu nobody true
 
 # 生成 UTF-8 locale（PostgreSQL 需要）
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
     && locale-gen
 
 ENV LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    LD_LIBRARY_PATH=/opt/postgresql/lib
 
 # CIS Docker 4.8 - 移除不必要的 setuid/setgid 权限
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
