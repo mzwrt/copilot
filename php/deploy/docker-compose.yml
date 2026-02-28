@@ -1,0 +1,114 @@
+# =======================================================
+# PHP-FPM Docker Compose - 拉取预构建镜像部署
+# 适用于直接使用 GitHub Actions 预构建的镜像
+# 符合 CIS Docker Benchmark 安全基准
+# =======================================================
+#
+# 使用方法:
+#   1. 修改下方 image 地址为你的 Docker Hub 镜像地址
+#   2. 启动: docker compose up -d
+#   3. 停止: docker compose down
+#   4. 日志: docker compose logs -f php
+#
+# 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
+#   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
+#
+# 如果镜像是公开的（Public），则不需要登录即可拉取
+#
+
+services:
+  php:
+    # ================================================================
+    # ⚠️ 请修改为你自己的镜像地址
+    # 格式: <Docker Hub用户名>/php-fpm:latest
+    # ================================================================
+    image: ihccccom/php-fpm:latest
+    container_name: php
+
+    # 端口映射（通常 PHP-FPM 不需要暴露端口，通过 Docker 网络与 Nginx 通信）
+    # ports:
+    #   - "9000:9000"
+
+    # 数据卷（使用命名卷，首次运行自动从镜像初始化）
+    volumes:
+      - php-conf:/opt/php/etc                 # PHP 配置文件
+      - php-logs:/opt/php/var/log             # PHP-FPM 日志
+      - wwwroot:/www/wwwroot                  # 网站根目录（与 Nginx 共享）
+
+    # ============================================================
+    # CIS Docker Benchmark 安全配置
+    # ============================================================
+
+    # CIS 5.25 - 限制容器获取额外权限
+    security_opt:
+      - no-new-privileges:true
+
+    # CIS 5.3 - 限制 Linux 内核能力
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN               # 修改文件属主
+      - SETUID              # 切换用户（master→worker）
+      - SETGID              # 切换用户组
+      - DAC_OVERRIDE        # 文件权限覆盖
+
+    # CIS 5.10/5.11 - 资源限制（防止资源耗尽攻击）
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "4.0"
+          pids: 200
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+
+    # CIS 5.12 - 限制容器重启策略
+    restart: unless-stopped
+
+    # CIS 5.12 - 只读根文件系统（最小攻击面）
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+      - /run:rw,noexec,nosuid,size=8m
+
+    # CIS 5.26 - 健康检查
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # 日志配置（防止日志无限增长）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "php-fpm"
+
+    # CIS 5.18 - 限制共享内存
+    shm_size: "256m"
+
+    # 容器主机名
+    hostname: php
+
+    # 网络配置
+    networks:
+      - nginx-network
+
+# 命名卷定义
+volumes:
+  php-conf:
+    name: php-conf
+  php-logs:
+    name: php-logs
+  wwwroot:
+    name: wwwroot
+
+# 网络定义
+networks:
+  nginx-network:
+    name: nginx-network
+    driver: bridge
