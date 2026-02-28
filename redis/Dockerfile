@@ -54,7 +54,7 @@ RUN mkdir -p ${REDIS_SRC_DIR} \
 
 # 下载 Redis 源码
 RUN cd ${REDIS_SRC_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz" \
     && tar -zxf "redis-${REDIS_VERSION}.tar.gz" \
     && mv "redis-${REDIS_VERSION}" redis \
@@ -95,8 +95,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     libsystemd0 \
+    gosu \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && gosu nobody true
 
 # CIS Docker 4.8 - 移除不必要的 setuid/setgid 权限
 RUN find / -perm /6000 -type f -exec chmod a-s {} \; 2>/dev/null || true
@@ -143,6 +145,11 @@ RUN touch ${REDIS_DIR}/var/log/redis.log \
 # CIS Docker 4.9 - 使用 COPY 而非 ADD
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 500 /docker-entrypoint.sh
+
+# 创建健康检查脚本（在构建时创建，避免运行时写入只读文件系统）
+RUN printf '#!/bin/sh\nREDIS_DIR="/opt/redis"\nif [ -n "${REDIS_PASSWORD}" ]; then\n  ${REDIS_DIR}/bin/redis-cli -p 36379 -a "${REDIS_PASSWORD}" --no-auth-warning ping | grep -q PONG\nelse\n  ${REDIS_DIR}/bin/redis-cli -p 36379 ping | grep -q PONG\nfi\n' \
+    > /usr/local/bin/redis-healthcheck \
+    && chmod 555 /usr/local/bin/redis-healthcheck
 
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \

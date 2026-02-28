@@ -153,7 +153,7 @@ RUN mkdir -p ${PHP_SRC_DIR} \
 
 # 下载 PHP 源码
 RUN cd ${PHP_SRC_DIR} \
-    && wget --tries=5 --waitretry=2 --no-check-certificate \
+    && wget --tries=5 --waitretry=2 \
        "https://www.php.net/distributions/php-${PHP_VERSION}.tar.gz" \
     && tar -zxf "php-${PHP_VERSION}.tar.gz" \
     && mv "php-${PHP_VERSION}" php \
@@ -406,8 +406,8 @@ RUN set -eux; \
 # 复制 Snuffleupagus 安全规则配置（条件性使用）
 COPY conf/snuffleupagus.rules ${PHP_DIR}/etc/snuffleupagus.rules
 
-# 创建默认 PHP 测试页面
-RUN echo '<?php phpinfo(); ?>' > /www/wwwroot/html/phpinfo.php
+# 创建默认 PHP 测试页面（仅返回状态信息，不暴露 phpinfo - PCI DSS 合规）
+RUN echo '<?php echo "OK"; ?>' > /www/wwwroot/html/index.php
 
 # ============================================================
 # 文件权限设置（CIS Docker Benchmark 合规）
@@ -436,6 +436,11 @@ RUN touch ${PHP_DIR}/var/log/php-fpm.log \
 # CIS Docker 4.9 - 使用 COPY 而非 ADD
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 500 /docker-entrypoint.sh
+
+# 创建健康检查脚本（在构建时创建，避免运行时写入只读文件系统）
+RUN printf '#!/bin/sh\nif pgrep -x "php-fpm" > /dev/null 2>&1; then\n  exit 0\nelse\n  exit 1\nfi\n' \
+    > /usr/local/bin/php-fpm-healthcheck \
+    && chmod 555 /usr/local/bin/php-fpm-healthcheck
 
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \

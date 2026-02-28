@@ -1,0 +1,133 @@
+# =======================================================
+# PostgreSQL Docker Compose - 本地构建（Local Build）
+# 适用于：在本地从源码编译构建 PostgreSQL Docker 镜像
+# 符合 CIS Docker Benchmark 安全基准
+# =======================================================
+#
+# 使用方法:
+#   docker compose up -d               # 构建并启动
+#   docker compose down                 # 停止
+#   docker compose logs -f postgresql   # 查看日志
+#   docker compose restart postgresql   # 重启
+#
+# 仅构建镜像:
+#   docker compose build                                  # 使用默认配置构建
+#   docker compose build --build-arg PG_VERSION=17.4      # 指定 PostgreSQL 版本
+#
+# 如需使用预构建镜像（GitHub Actions 构建），请使用:
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+
+services:
+  postgresql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 构建参数（取消注释以自定义）
+      # args:
+      #   PG_VERSION: "17.4"
+    image: postgresql:latest
+    container_name: postgresql
+
+    # 端口映射（通常 PostgreSQL 不需要暴露端口，通过 Docker 网络通信）
+    # ports:
+    #   - "55432:55432"
+
+    # 环境变量
+    environment:
+      # 设置 PostgreSQL 超级用户密码（强烈建议设置）
+      # POSTGRES_PASSWORD: "your_secure_password_here"
+      # 创建应用数据库（可选）
+      # POSTGRES_DB: "myapp"
+      # 创建应用用户（可选，使用 POSTGRES_PASSWORD 作为密码）
+      # POSTGRES_USER: "myapp_user"
+      TZ: Asia/Shanghai
+
+    # 数据卷（使用命名卷，首次运行自动从镜像初始化）
+    volumes:
+      - postgresql-conf:/opt/postgresql/etc         # PostgreSQL 配置文件
+      - postgresql-data:/opt/postgresql/data        # PostgreSQL 数据目录
+      - postgresql-wal:/opt/postgresql/wal          # PostgreSQL WAL 日志
+      - postgresql-logs:/opt/postgresql/var/log     # PostgreSQL 日志
+
+    # ============================================================
+    # CIS Docker Benchmark 安全配置
+    # ============================================================
+
+    # CIS 5.25 - 限制容器获取额外权限
+    security_opt:
+      - no-new-privileges:true
+
+    # CIS 5.3 - 限制 Linux 内核能力
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN               # 修改文件属主
+      - SETUID              # 切换用户
+      - SETGID              # 切换用户组
+      - DAC_OVERRIDE        # 文件权限覆盖
+      - FOWNER              # 文件所有者操作
+
+    # CIS 5.10/5.11 - 资源限制（防止资源耗尽攻击）
+    # 注意：容器内存限制 (4G) 高于 PostgreSQL shared_buffers (512MB)，为系统和缓存预留空间
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "4.0"
+          pids: 300
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+    # CIS 5.12 - 限制容器重启策略
+    restart: unless-stopped
+
+    # CIS 5.12 - 只读根文件系统（最小攻击面）
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /run:rw,noexec,nosuid,size=8m
+
+    # CIS 5.26 - 健康检查（已在 Dockerfile 中定义）
+    healthcheck:
+      test: ["CMD-SHELL", "pg-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    # 日志配置（防止日志无限增长）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "postgresql"
+
+    # CIS 5.18 - 限制共享内存
+    shm_size: "512m"
+
+    # 容器主机名
+    hostname: postgresql
+
+    # 网络配置
+    networks:
+      - nginx-network
+
+# 命名卷定义
+volumes:
+  postgresql-conf:
+    name: postgresql-conf
+  postgresql-data:
+    name: postgresql-data
+  postgresql-wal:
+    name: postgresql-wal
+  postgresql-logs:
+    name: postgresql-logs
+
+# 网络定义
+networks:
+  nginx-network:
+    name: nginx-network
+    driver: bridge
