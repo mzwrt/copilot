@@ -18,8 +18,10 @@ touch ${REDIS_DIR}/var/log/redis.log 2>/dev/null || true
 if [ -n "${REDIS_PASSWORD}" ]; then
     # Remove any existing requirepass directive to prevent duplicates on restart
     sed -i '/^requirepass /d' ${REDIS_DIR}/etc/redis.conf
-    # Use printf to write password directly to a temp file, avoiding sed metacharacter issues
-    printf 'requirepass %s\n' "${REDIS_PASSWORD}" > /tmp/redis_auth.conf
+    # Escape backslashes and double quotes, then wrap in double quotes for Redis config format
+    # This ensures passwords with spaces, #, ", or \ are parsed correctly
+    ESCAPED_REDIS_PASS=$(printf '%s' "${REDIS_PASSWORD}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    printf 'requirepass "%s"\n' "${ESCAPED_REDIS_PASS}" > /tmp/redis_auth.conf
     # Append to the config after the comment marker
     sed -i '/^# requirepass/r /tmp/redis_auth.conf' ${REDIS_DIR}/etc/redis.conf
     rm -f /tmp/redis_auth.conf
