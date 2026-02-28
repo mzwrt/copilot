@@ -269,7 +269,7 @@ docker logs nginx
 | `latest` | 推送到 main 分支 | `nginx:latest` |
 | `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
 | `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
-| `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |
+| `nginx-1.28.2` | 所有构建 | `nginx:nginx-1.28.2` |
 
 ---
 
@@ -299,8 +299,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NGINX_VERSION: "1.28.0"
-        OPENSSL_VERSION: "3.5.4"
+        NGINX_VERSION: "1.28.2"
+        OPENSSL_VERSION: "3.5.5"
         USE_modsecurity: "true"
         USE_owasp: "true"
         NGINX_FAKE_NAME: "MyServer"
@@ -479,8 +479,8 @@ docker exec -it nginx /bin/bash
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_VERSION` | `1.28.0` | Nginx 版本号（必须指定） |
-| `OPENSSL_VERSION` | `3.5.4` | OpenSSL 版本号（必须指定） |
+| `NGINX_VERSION` | `1.28.2` | Nginx 版本号（必须指定） |
+| `OPENSSL_VERSION` | `3.5.5` | OpenSSL 版本号（必须指定） |
 | `PCRE2_VERSION` | `""` | PCRE2 版本，留空自动获取最新版 |
 | `FANCYINDEX_VERSION` | `0.5.2` | ngx-fancyindex 版本号 |
 | `NGX_CACHE_PURGE_VERSION` | `""` | ngx_cache_purge 版本，留空自动获取 |
@@ -493,8 +493,8 @@ docker exec -it nginx /bin/bash
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_FAKE_NAME` | `""` | 自定义服务器名称（伪装） |
-| `NGINX_VERSION_NUMBER` | `""` | 自定义版本号（伪装 nginx.h 中的版本） |
+| `NGINX_FAKE_NAME` | `"CloudFlare"` | 自定义服务器名称（伪装），留空使用默认值 |
+| `NGINX_VERSION_NUMBER` | `"8.2.6"` | 自定义版本号（伪装 nginx.h 中的版本），留空使用默认版本号 |
 | `EXTRA_CC_OPT` | `""` | 额外 C 编译选项 |
 | `EXTRA_NGINX_MODULES` | `""` | 额外 Nginx 模块参数（如 `--add-module=/path/to/mod`） |
 
@@ -625,7 +625,7 @@ SecRuleRemoveById 942100  # 排除特定规则
 
 **A**: 修改 Dockerfile 中的 `NGINX_VERSION` 参数并重新构建：
 ```bash
-docker build --build-arg NGINX_VERSION=1.28.0 -t nginx:latest ./nginx/
+docker build --build-arg NGINX_VERSION=1.28.2 -t nginx:latest ./nginx/
 ```
 
 或使用 GitHub Actions 手动触发构建时指定版本。

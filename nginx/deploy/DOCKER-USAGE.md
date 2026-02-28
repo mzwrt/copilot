@@ -561,4 +561,4 @@ docker exec -it nginx /bin/bash
 | `latest` | 推送到 main 分支 | `nginx:latest` |
 | `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
 | `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
-| `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |
+| `nginx-1.28.2` | 所有构建 | `nginx:nginx-1.28.2` |
