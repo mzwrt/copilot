@@ -131,8 +131,8 @@ docker logs redis
 
 | Secret 名称 | 说明 |
 |-------------|------|
-| `docker_redis_USER` | Docker Hub 用户名 |
-| `DOCKER_REDIS_TOKEN` | Docker Hub Access Token |
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名 |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token |
 
 #### 步骤 2：触发构建
 

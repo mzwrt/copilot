@@ -147,8 +147,8 @@ docker logs php
 
 | Secret 名称 | 说明 |
 |-------------|------|
-| `docker_php_USER` | Docker Hub 用户名 |
-| `DOCKER_PHP_TOKEN` | Docker Hub Access Token |
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名 |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token |
 
 #### 步骤 2：触发构建
 

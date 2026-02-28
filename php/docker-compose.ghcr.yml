@@ -20,9 +20,9 @@ services:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
     # 格式: <Docker Hub用户名>/php-fpm:latest
-    # 示例: mzwrt/php-fpm:latest
+    # 示例: ihccccom/php-fpm:latest
     # ================================================================
-    image: mzwrt/php-fpm:latest
+    image: ihccccom/php-fpm:latest
     container_name: php
 
     # 端口映射（通常 PHP-FPM 不需要暴露端口，通过 Docker 网络与 Nginx 通信）

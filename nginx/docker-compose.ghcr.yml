@@ -20,9 +20,9 @@ services:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
     # 格式: <Docker Hub用户名>/nginx:latest
-    # 示例: mzwrt/nginx:latest
+    # 示例: ihccccom/nginx:latest
     # ================================================================
-    image: mzwrt/nginx:latest
+    image: ihccccom/nginx:latest
     container_name: nginx
 
     # 端口映射

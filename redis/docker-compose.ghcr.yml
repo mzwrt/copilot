@@ -20,9 +20,9 @@ services:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
     # 格式: <Docker Hub用户名>/redis:latest
-    # 示例: mzwrt/redis:latest
+    # 示例: ihccccom/redis:latest
     # ================================================================
-    image: mzwrt/redis:latest
+    image: ihccccom/redis:latest
     container_name: redis
 
     # 端口映射（通常 Redis 不需要暴露端口，通过 Docker 网络与 PHP 通信）
