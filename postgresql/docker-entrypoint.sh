@@ -67,7 +67,7 @@ if [ ! -f "${PGDATA}/PG_VERSION" ]; then
             gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE USER \"${ESCAPED_USER}\" WITH PASSWORD '${ESCAPED_PASSWORD}';"
             if [ -n "${POSTGRES_DB}" ]; then
                 gosu postgres ${PG_DIR}/bin/psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE \"${ESCAPED_DB}\" TO \"${ESCAPED_USER}\";"
-                gosu postgres ${PG_DIR}/bin/psql -U postgres -d "${ESCAPED_DB}" -c "GRANT ALL ON SCHEMA public TO \"${ESCAPED_USER}\";"
+                gosu postgres ${PG_DIR}/bin/psql -U postgres -d "${POSTGRES_DB}" -c "GRANT ALL ON SCHEMA public TO \"${ESCAPED_USER}\";"
             fi
             echo "User '${POSTGRES_USER}' created and granted privileges"
         fi
