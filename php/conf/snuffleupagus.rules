@@ -30,15 +30,17 @@ sp.ini.key("zend.assertions").set("-1").drop();
 sp.xxe_protection.enable();
 
 ; ============================================================
-; 限制文件上传的 MIME 类型
-; 仅允许常见安全的文件类型
+; 限制文件上传的 MIME 类型（可选）
+; 如需启用，创建验证脚本后取消注释
 ; ============================================================
-sp.upload_validation.script("/opt/php/etc/snuffleupagus_upload_check.sh").enable();
+; sp.upload_validation.script("/opt/php/etc/snuffleupagus_upload_check.sh").enable();
 
 ; ============================================================
-; 防御 mail() 函数注入攻击
+; 防御 mail() 函数注入攻击（可选）
+; 限制 mail() 函数仅允许指定来源，取消注释以启用
+; 注意：此规则会限制通过外部 SMTP 发送邮件
 ; ============================================================
-sp.global.mail_allowlist("127.0.0.1").enable();
+; sp.global.mail_allowlist("127.0.0.1").enable();
 
 ; ============================================================
 ; 自动加密 Session 数据（防止 Session 劫持）
