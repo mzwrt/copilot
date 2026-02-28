@@ -6,12 +6,12 @@
 # =======================================================
 #
 # 构建示例:
-#   docker build -t nginx-custom .
-#   docker build --build-arg USE_modsecurity=false -t nginx-custom .
-#   docker build --build-arg NGINX_FAKE_NAME="MyServer" -t nginx-custom .
+#   docker build -t nginx .
+#   docker build --build-arg USE_modsecurity=false -t nginx .
+#   docker build --build-arg NGINX_FAKE_NAME="MyServer" -t nginx .
 #
 # 运行示例:
-#   docker run -d -p 80:80 -p 443:443 --name nginx nginx-custom
+#   docker run -d -p 80:80 -p 443:443 --name nginx nginx
 #   docker compose up -d
 #
 
@@ -429,8 +429,8 @@ FROM debian:bookworm-slim
 # hadolint ignore=DL4006
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# OCI 镜像标签（用于 GHCR 展示）
-LABEL org.opencontainers.image.title="Nginx Custom" \
+# OCI 镜像标签（用于 Docker Hub 展示）
+LABEL org.opencontainers.image.title="Nginx" \
       org.opencontainers.image.description="Security-hardened Nginx with ModSecurity WAF, CIS Benchmark compliant" \
       org.opencontainers.image.source="https://github.com/mzwrt/copilot" \
       org.opencontainers.image.licenses="MIT"

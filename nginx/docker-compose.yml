@@ -52,7 +52,7 @@ services:
       #   # === 伪装配置 ===
       #   NGINX_FAKE_NAME: "OWASP WAF"
       #   NGINX_VERSION_NUMBER: "5.1.24"
-    image: nginx-custom:latest
+    image: nginx:latest
     container_name: nginx
 
     # 端口映射
