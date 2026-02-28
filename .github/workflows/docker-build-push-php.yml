@@ -137,7 +137,7 @@ jobs:
       # ==========================================
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        if: contains(github.event.inputs.platforms || 'linux/amd64', 'arm64')
+        if: contains(github.event.inputs.platforms || 'linux/amd64,linux/arm64', 'arm64')
 
       # ==========================================
       # 5. 登录 Docker Hub
@@ -177,7 +177,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: ${{ github.event.inputs.platforms || 'linux/amd64' }}
+          platforms: ${{ github.event.inputs.platforms || 'linux/amd64,linux/arm64' }}
           build-args: |
             PHP_VERSION=${{ github.event.inputs.php_version || steps.versions.outputs.php_version }}
             USE_redis=${{ github.event.inputs.use_redis || 'true' }}
