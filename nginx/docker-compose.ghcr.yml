@@ -1,28 +1,28 @@
 # =======================================================
-# Nginx Docker Compose - 拉取预构建镜像（从 GitHub Container Registry）
+# Nginx Docker Compose - 拉取预构建镜像（从 Docker Hub）
 # 适用于：直接使用 GitHub Actions 预构建的镜像，无需本地编译
 # =======================================================
 #
 # 使用方法:
-#   1. 修改下方 image 地址为你的 GHCR 镜像地址
+#   1. 修改下方 image 地址为你的 Docker Hub 镜像地址
 #   2. 启动: docker compose -f docker-compose.ghcr.yml up -d
 #   3. 停止: docker compose -f docker-compose.ghcr.yml down
 #   4. 日志: docker compose -f docker-compose.ghcr.yml logs -f nginx
 #
-# 首次使用需要登录 GHCR（避免在命令行直接暴露 Token）:
-#   cat ~/github_token.txt | docker login ghcr.io -u <你的GitHub用户名> --password-stdin
+# 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
+#   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
 #
-# 如果仓库是公开的（Public），则不需要登录即可拉取
+# 如果镜像是公开的（Public），则不需要登录即可拉取
 #
 
 services:
   nginx:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
-    # 格式: ghcr.io/<GitHub用户名>/<仓库名>/nginx-custom:latest
-    # 示例: ghcr.io/mzwrt/copilot/nginx-custom:latest
+    # 格式: <Docker Hub用户名>/nginx:latest
+    # 示例: mzwrt/nginx:latest
     # ================================================================
-    image: ghcr.io/mzwrt/copilot/nginx-custom:latest
+    image: mzwrt/nginx:latest
     container_name: nginx
 
     # 端口映射

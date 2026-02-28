@@ -41,15 +41,15 @@ curl -k https://localhost/
 
 ## 使用预构建镜像（推荐）
 
-### 步骤 1：登录 GHCR（私有仓库需要）
+### 步骤 1：登录 Docker Hub（私有仓库需要）
 
 如果镜像仓库是公开的，可跳过此步骤。
 
 ```bash
 # 将 Token 保存到文件，避免在命令行直接暴露
-echo "你的TOKEN" > ~/.ghcr_token
-cat ~/.ghcr_token | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
-rm ~/.ghcr_token
+echo "你的TOKEN" > ~/.dockerhub_token
+cat ~/.dockerhub_token | docker login -u 你的DockerHub用户名 --password-stdin
+rm ~/.dockerhub_token
 ```
 
 ### 步骤 2：配置 docker-compose.ghcr.yml
@@ -59,7 +59,7 @@ rm ~/.ghcr_token
 ```yaml
 services:
   nginx:
-    image: ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+    image: <你的用户名>/nginx:latest
 ```
 
 ### 步骤 3：启动
@@ -555,8 +555,8 @@ docker exec -it nginx /bin/bash
 
 | 标签格式 | 触发条件 | 示例 |
 |---------|---------|------|
-| `latest` | 推送到 main 分支 | `nginx-custom:latest` |
-| `v1.0.0` | 创建 v1.0.0 标签 | `nginx-custom:v1.0.0` |
-| `1.0` | 创建 v1.0.x 标签 | `nginx-custom:1.0` |
-| `sha-abc1234` | 所有推送 | `nginx-custom:sha-abc1234` |
-| `nginx-1.28.0` | 所有构建 | `nginx-custom:nginx-1.28.0` |
+| `latest` | 推送到 main 分支 | `nginx:latest` |
+| `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
+| `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
+| `sha-abc1234` | 所有推送 | `nginx:sha-abc1234` |
+| `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |

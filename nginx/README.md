@@ -8,7 +8,7 @@
 - [目录结构](#目录结构)
 - [快速开始](#快速开始)
 - [部署教程](#部署教程)
-  - [GitHub Actions 构建与 GHCR 拉取教程](#github-actions-构建与-ghcr-拉取教程)
+  - [GitHub Actions 构建与 Docker Hub 拉取教程](#github-actions-构建与-docker-hub-拉取教程)
   - [本地构建教程](#本地构建教程)
 - [安全基准实现](#安全基准实现)
 - [架构图](#架构图)
@@ -47,12 +47,12 @@
 ```
 .github/
 └── workflows/
-    └── docker-build-push.yml          # GitHub Actions 构建并发布到 GHCR
+    └── docker-build-push.yml          # GitHub Actions 构建并发布到 Docker Hub
 
 nginx/
 ├── Dockerfile                         # 多阶段 Docker 构建（源码编译 Nginx + ModSecurity）
 ├── docker-compose.yml                 # Docker Compose - 本地构建用
-├── docker-compose.ghcr.yml            # Docker Compose - 拉取 GHCR 预构建镜像用
+├── docker-compose.ghcr.yml            # Docker Compose - 拉取 Docker Hub 预构建镜像用
 ├── docker-entrypoint.sh               # 容器入口脚本（权限检查）
 ├── nginx-install.sh                   # 原始裸机安装脚本（参考用）
 ├── .dockerignore                      # 构建上下文排除规则
@@ -112,9 +112,9 @@ nginx/
 
 > 📖 **Docker 使用教程**（部署、配置、运维）已独立为 **[DOCKER-USAGE.md](DOCKER-USAGE.md)**，方便发布到其他仓库供用户使用。
 
-### 方式一：使用预构建镜像（推荐 - 从 GHCR 拉取）
+### 方式一：使用预构建镜像（推荐 - 从 Docker Hub 拉取）
 
-镜像由 GitHub Actions 自动构建并发布到 GitHub Container Registry，无需本地编译。
+镜像由 GitHub Actions 自动构建并发布到 Docker Hub，无需本地编译。
 
 ```bash
 cd nginx
@@ -129,7 +129,7 @@ docker compose -f docker-compose.ghcr.yml ps
 docker compose -f docker-compose.ghcr.yml logs -f nginx
 ```
 
-> 📖 详细教程请参阅下方 [GitHub Actions 构建与 GHCR 拉取教程](#github-actions-构建与-ghcr-拉取教程)
+> 📖 详细教程请参阅下方 [GitHub Actions 构建与 Docker Hub 拉取教程](#github-actions-构建与-docker-hub-拉取教程)
 
 ### 方式二：本地构建
 
@@ -173,11 +173,11 @@ docker logs nginx
 
 ## 部署教程
 
-### GitHub Actions 构建与 GHCR 拉取教程
+### GitHub Actions 构建与 Docker Hub 拉取教程
 
 #### 概述
 
-本项目提供 GitHub Actions 工作流（`.github/workflows/docker-build-push.yml`），自动编译 Nginx Docker 镜像并发布到 GitHub Container Registry (GHCR)。你只需在本地拉取预构建好的镜像即可使用，无需本地编译。
+本项目提供 GitHub Actions 工作流（`.github/workflows/docker-build-push.yml`），自动编译 Nginx Docker 镜像并发布到 Docker Hub。你只需在本地拉取预构建好的镜像即可使用，无需本地编译。
 
 **优势**：
 - ✅ 无需本地编译，节省时间和资源
@@ -214,14 +214,14 @@ docker logs nginx
 3. 勾选 `read:packages` 权限
 4. 生成并保存 Token
 
-#### 步骤 4：本地登录 GHCR（私有仓库需要）
+#### 步骤 4：本地登录 Docker Hub（私有仓库需要）
 
 ```bash
 # 公开仓库可跳过此步骤
 # 将 Token 保存到文件，避免在命令行直接暴露
-echo "你的TOKEN" > ~/.ghcr_token
-cat ~/.ghcr_token | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
-rm ~/.ghcr_token
+echo "你的TOKEN" > ~/.dockerhub_token
+cat ~/.dockerhub_token | docker login -u 你的DockerHub用户名 --password-stdin
+rm ~/.dockerhub_token
 ```
 
 #### 步骤 5：本地拉取并运行
@@ -231,12 +231,12 @@ cd nginx
 
 # 方式一：使用 docker-compose.ghcr.yml（推荐）
 # 先编辑 docker-compose.ghcr.yml，修改 image 为你的镜像地址
-# image: ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+# image: <你的用户名>/nginx:latest
 docker compose -f docker-compose.ghcr.yml up -d
 
 # 方式二：手动拉取并运行
-docker pull ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
-docker run -d -p 80:80 -p 443:443 --name nginx ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+docker pull <你的用户名>/nginx:latest
+docker run -d -p 80:80 -p 443:443 --name nginx <你的用户名>/nginx:latest
 ```
 
 #### 步骤 6：验证
@@ -256,11 +256,11 @@ docker logs nginx
 
 | 标签格式 | 触发条件 | 示例 |
 |---------|---------|------|
-| `latest` | 推送到 main 分支 | `nginx-custom:latest` |
-| `v1.0.0` | 创建 v1.0.0 标签 | `nginx-custom:v1.0.0` |
-| `1.0` | 创建 v1.0.x 标签 | `nginx-custom:1.0` |
-| `sha-abc1234` | 所有推送 | `nginx-custom:sha-abc1234` |
-| `nginx-1.28.0` | 所有构建 | `nginx-custom:nginx-1.28.0` |
+| `latest` | 推送到 main 分支 | `nginx:latest` |
+| `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
+| `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
+| `sha-abc1234` | 所有推送 | `nginx:sha-abc1234` |
+| `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |
 
 ---
 
@@ -268,7 +268,7 @@ docker logs nginx
 
 #### 概述
 
-在本地从源码编译构建 Nginx Docker 镜像，适用于需要自定义编译选项或无法访问 GHCR 的场景。
+在本地从源码编译构建 Nginx Docker 镜像，适用于需要自定义编译选项或无法访问 Docker Hub 的场景。
 
 **注意**：编译过程需要下载源码并编译，首次构建耗时约 **15-30 分钟**（取决于网络和 CPU）。
 
@@ -310,7 +310,7 @@ docker compose build --build-arg NGINX_FAKE_NAME="MyServer" --build-arg USE_mods
 docker compose build
 
 # 或直接使用 docker build
-docker build -t nginx-custom:latest .
+docker build -t nginx:latest .
 ```
 
 #### 步骤 4：启动容器
@@ -493,19 +493,19 @@ docker exec -it nginx /bin/bash
 
 ```bash
 # 基本构建
-docker build -t nginx-custom:latest ./nginx/
+docker build -t nginx:latest ./nginx/
 
 # 禁用 ModSecurity
-docker build --build-arg USE_modsecurity=false -t nginx-custom:latest ./nginx/
+docker build --build-arg USE_modsecurity=false -t nginx:latest ./nginx/
 
 # 自定义服务器名称和伪装版本号
-docker build --build-arg NGINX_FAKE_NAME="MyServer" --build-arg NGINX_VERSION_NUMBER="5.1.24" -t nginx-custom:latest ./nginx/
+docker build --build-arg NGINX_FAKE_NAME="MyServer" --build-arg NGINX_VERSION_NUMBER="5.1.24" -t nginx:latest ./nginx/
 
 # 指定特定插件版本
-docker build --build-arg HEADERS_MORE_VERSION="0.37" --build-arg OWASP_CRS_VERSION="v4.7.0" -t nginx-custom:latest ./nginx/
+docker build --build-arg HEADERS_MORE_VERSION="0.37" --build-arg OWASP_CRS_VERSION="v4.7.0" -t nginx:latest ./nginx/
 
 # 添加额外自定义模块
-docker build --build-arg EXTRA_NGINX_MODULES="--add-module=/opt/nginx/src/my_module" -t nginx-custom:latest ./nginx/
+docker build --build-arg EXTRA_NGINX_MODULES="--add-module=/opt/nginx/src/my_module" -t nginx:latest ./nginx/
 ```
 
 ## 卷挂载说明
@@ -616,7 +616,7 @@ SecRuleRemoveById 942100  # 排除特定规则
 
 **A**: 修改 Dockerfile 中的 `NGINX_VERSION` 参数并重新构建：
 ```bash
-docker build --build-arg NGINX_VERSION=1.28.0 -t nginx-custom:latest ./nginx/
+docker build --build-arg NGINX_VERSION=1.28.0 -t nginx:latest ./nginx/
 ```
 
 或使用 GitHub Actions 手动触发构建时指定版本。
@@ -624,7 +624,7 @@ docker build --build-arg NGINX_VERSION=1.28.0 -t nginx-custom:latest ./nginx/
 ### Q: 如何在生产环境部署
 
 **A**: 推荐步骤：
-1. 使用 GitHub Actions 构建镜像，通过 GHCR 拉取到生产服务器
+1. 使用 GitHub Actions 构建镜像，通过 Docker Hub 拉取到生产服务器
 2. 配置正式 SSL 证书（Let's Encrypt 或 CA 签发）
 3. 加载 AppArmor Profile 到所有节点
 4. 配置 daemon.json 安全选项
