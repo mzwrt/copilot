@@ -637,7 +637,7 @@ RUN chmod 500 /docker-entrypoint.sh
 
 # CIS Docker 4.6 - 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD curl -sf http://127.0.0.1/ || exit 1
+    CMD curl -sf http://127.0.0.1/nginx-health || exit 1
 
 EXPOSE 80 443
 

@@ -117,7 +117,7 @@ services:
     # CIS 5.26 - 健康检查（已在 Dockerfile 中定义）
     # 此处可覆盖 Dockerfile 中的健康检查配置
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1/"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1/nginx-health"]
       interval: 30s
       timeout: 5s
       retries: 3
