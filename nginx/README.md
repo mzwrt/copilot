@@ -42,10 +42,15 @@
 ## 目录结构
 
 ```
+.github/
+└── workflows/
+    └── docker-build-push.yml          # GitHub Actions 构建并发布到 GHCR
+
 nginx/
 ├── Dockerfile                         # 多阶段 Docker 构建（源码编译 Nginx + ModSecurity）
-├── docker-compose.yml                 # Docker Compose 安全配置（CIS 基准加固）
-├── docker-entrypoint.sh               # 容器入口脚本（权限检查、Secrets 加载）
+├── docker-compose.yml                 # Docker Compose - 本地构建用
+├── docker-compose.ghcr.yml            # Docker Compose - 拉取 GHCR 预构建镜像用
+├── docker-entrypoint.sh               # 容器入口脚本（权限检查）
 ├── nginx-install.sh                   # 原始裸机安装脚本（参考用）
 ├── .dockerignore                      # 构建上下文排除规则
 ├── README.md                          # 📖 本文件
@@ -89,52 +94,245 @@ nginx/
 
 ## 快速开始
 
-### 1. 构建安全镜像
+### 方式一：使用预构建镜像（推荐 - 从 GHCR 拉取）
 
-```bash
-docker build -t nginx-hardened:latest ./nginx/
-```
-
-### 2. 准备 SSL 证书
-
-```bash
-mkdir -p certs
-
-# 生成自签名证书（生产环境请使用 CA 签发证书）
-openssl req -x509 -nodes -days 365 \
-  -newkey rsa:2048 \
-  -keyout certs/server.key \
-  -out certs/server.crt \
-  -subj "/CN=localhost"
-
-# 生成 DH 参数
-openssl dhparam -out certs/dhparam.pem 2048
-```
-
-### 3. 启动容器
+镜像由 GitHub Actions 自动构建并发布到 GitHub Container Registry，无需本地编译。
 
 ```bash
 cd nginx
+
+# 拉取并启动（需先修改 docker-compose.ghcr.yml 中的镜像地址）
+docker compose -f docker-compose.ghcr.yml up -d
+
+# 查看容器状态
+docker compose -f docker-compose.ghcr.yml ps
+
+# 查看日志
+docker compose -f docker-compose.ghcr.yml logs -f nginx
+```
+
+> 📖 详细教程请参阅下方 [GitHub Actions 构建与 GHCR 拉取教程](#github-actions-构建与-ghcr-拉取教程)
+
+### 方式二：本地构建
+
+在本地从源码编译 Nginx 及所有模块（编译耗时约 15-30 分钟）。
+
+```bash
+cd nginx
+
+# 构建镜像
+docker compose build
+
+# 启动容器
 docker compose up -d
 ```
 
-### 4. 验证部署
+> 📖 详细教程请参阅下方 [本地构建教程](#本地构建教程)
+
+### 验证部署
 
 ```bash
 # 运行安全验证脚本
 bash tests/validate.sh
 
+# 手动验证 HTTP
+curl http://localhost/
+
 # 手动验证 HTTPS
-curl -k https://localhost:8443/
+curl -k https://localhost/
 
 # 运行 CIS Docker 基准检查
 sudo bash security/cis-docker-benchmark/docker-bench-check.sh
 ```
 
-### 5. 查看日志
+### 查看日志
 
 ```bash
-docker logs nginx-secure
+docker logs nginx
+```
+
+---
+
+## 部署教程
+
+### GitHub Actions 构建与 GHCR 拉取教程
+
+#### 概述
+
+本项目提供 GitHub Actions 工作流（`.github/workflows/docker-build-push.yml`），自动编译 Nginx Docker 镜像并发布到 GitHub Container Registry (GHCR)。你只需在本地拉取预构建好的镜像即可使用，无需本地编译。
+
+**优势**：
+- ✅ 无需本地编译，节省时间和资源
+- ✅ 自动化构建，每次代码更新自动发布新镜像
+- ✅ 支持多架构（amd64/arm64）
+- ✅ 支持版本标签管理
+
+#### 步骤 1：启用 GitHub Actions
+
+确保仓库的 GitHub Actions 已启用：
+1. 进入仓库页面 → **Settings** → **Actions** → **General**
+2. 选择 **Allow all actions and reusable workflows**
+3. 在 **Workflow permissions** 中选择 **Read and write permissions**
+
+#### 步骤 2：触发构建
+
+构建会在以下情况自动触发：
+- 推送到 `main` 分支且 `nginx/Dockerfile`、`nginx/docker-entrypoint.sh`、`nginx/.dockerignore` 有变更
+- 创建版本标签（如 `v1.0.0`）
+
+也可以手动触发：
+1. 进入仓库页面 → **Actions** → **Build and Push Nginx Docker Image**
+2. 点击 **Run workflow**
+3. 可选择配置 Nginx 版本、OpenSSL 版本、是否启用 ModSecurity 等
+4. 点击 **Run workflow** 开始构建
+
+#### 步骤 3：设置仓库可见性（公开仓库可跳过）
+
+如果仓库是 **Public**（公开），任何人都可以直接拉取镜像，无需额外设置。
+
+如果仓库是 **Private**（私有），需要创建 Personal Access Token：
+1. 进入 GitHub → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+2. 点击 **Generate new token (classic)**
+3. 勾选 `read:packages` 权限
+4. 生成并保存 Token
+
+#### 步骤 4：本地登录 GHCR（私有仓库需要）
+
+```bash
+# 公开仓库可跳过此步骤
+# 使用 Personal Access Token 登录
+echo "你的TOKEN" | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
+```
+
+#### 步骤 5：本地拉取并运行
+
+```bash
+cd nginx
+
+# 方式一：使用 docker-compose.ghcr.yml（推荐）
+# 先编辑 docker-compose.ghcr.yml，修改 image 为你的镜像地址
+# image: ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+docker compose -f docker-compose.ghcr.yml up -d
+
+# 方式二：手动拉取并运行
+docker pull ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+docker run -d -p 80:80 -p 443:443 --name nginx ghcr.io/<你的用户名>/<你的仓库名>/nginx-custom:latest
+```
+
+#### 步骤 6：验证
+
+```bash
+# 检查容器状态
+docker ps
+
+# 测试 HTTP 响应
+curl http://localhost/
+
+# 查看日志
+docker logs nginx
+```
+
+#### 版本标签说明
+
+| 标签格式 | 触发条件 | 示例 |
+|---------|---------|------|
+| `latest` | 推送到 main 分支 | `nginx-custom:latest` |
+| `v1.0.0` | 创建 v1.0.0 标签 | `nginx-custom:v1.0.0` |
+| `1.0` | 创建 v1.0.x 标签 | `nginx-custom:1.0` |
+| `sha-abc1234` | 所有推送 | `nginx-custom:sha-abc1234` |
+| `nginx-1.28.0` | 所有构建 | `nginx-custom:nginx-1.28.0` |
+
+---
+
+### 本地构建教程
+
+#### 概述
+
+在本地从源码编译构建 Nginx Docker 镜像，适用于需要自定义编译选项或无法访问 GHCR 的场景。
+
+**注意**：编译过程需要下载源码并编译，首次构建耗时约 **15-30 分钟**（取决于网络和 CPU）。
+
+#### 步骤 1：克隆仓库
+
+```bash
+git clone https://github.com/<你的用户名>/<你的仓库名>.git
+cd <你的仓库名>/nginx
+```
+
+#### 步骤 2：（可选）自定义构建参数
+
+编辑 `docker-compose.yml`，取消注释并修改 `args` 部分：
+
+```yaml
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NGINX_VERSION: "1.28.0"
+        OPENSSL_VERSION: "3.5.4"
+        USE_modsecurity: "true"
+        USE_owasp: "true"
+        NGINX_FAKE_NAME: "MyServer"
+```
+
+或者通过命令行传入构建参数：
+
+```bash
+docker compose build --build-arg NGINX_FAKE_NAME="MyServer" --build-arg USE_modsecurity=false
+```
+
+#### 步骤 3：构建镜像
+
+```bash
+# 使用 docker compose 构建
+docker compose build
+
+# 或直接使用 docker build
+docker build -t nginx-custom:latest .
+```
+
+#### 步骤 4：启动容器
+
+```bash
+# 使用 docker compose 启动
+docker compose up -d
+
+# 查看状态
+docker compose ps
+
+# 查看日志
+docker compose logs -f nginx
+```
+
+#### 步骤 5：验证
+
+```bash
+# HTTP 测试
+curl http://localhost/
+
+# HTTPS 测试（自签名证书）
+curl -k https://localhost/
+
+# 运行安全检查
+bash tests/validate.sh
+```
+
+#### 步骤 6：管理容器
+
+```bash
+# 停止
+docker compose down
+
+# 重启
+docker compose restart nginx
+
+# 查看卷数据
+docker volume ls | grep nginx
+
+# 进入容器调试
+docker exec -it nginx /bin/bash
 ```
 
 ## 安全基准实现
@@ -227,7 +425,7 @@ docker logs nginx-secure
 │  │  └────────────────────────────────────────────────┘  │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                             │
-│  端口映射: 443→8443 (HTTPS), 80→8080 (HTTP→HTTPS重定向)     │
+│  端口映射: 80→80 (HTTP), 443→443 (HTTPS)                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -235,100 +433,90 @@ docker logs nginx-secure
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_VERSION` | `1.26.1` | Nginx 版本号 |
-| `MODSECURITY_VERSION` | `3.0.12` | ModSecurity 版本号 |
-| `OWASP_CRS_VERSION` | `4.4.0` | OWASP CRS 规则集版本 |
-| `ALPINE_VERSION` | `3.20` | Alpine Linux 版本 |
-| `NGINX_USER` | `nginx` | Nginx 运行用户 |
-| `NGINX_UID` | `101` | Nginx 用户 UID |
-| `NGINX_GID` | `101` | Nginx 用户 GID |
+| `NGINX_VERSION` | `1.28.0` | Nginx 版本号 |
+| `OPENSSL_VERSION` | `3.5.4` | OpenSSL 版本号 |
+| `FANCYINDEX_VERSION` | `0.5.2` | ngx-fancyindex 版本号 |
+| `USE_modsecurity` | `true` | 启用 ModSecurity WAF |
+| `USE_owasp` | `true` | 启用 OWASP CRS 规则集 |
+| `USE_modsecurity_nginx` | `true` | 启用 ModSecurity-Nginx 连接器 |
+| `USE_ngx_brotli` | `true` | 启用 Brotli 压缩模块 |
+| `USE_openssl` | `true` | 使用自编译 OpenSSL |
+| `USE_PCRE2` | `true` | 启用 PCRE2 正则模块 |
+| `USE_ngx_cache_purge` | `true` | 启用缓存清除模块 |
+| `USE_ngx_http_headers_more_filter_module` | `true` | 启用自定义响应头模块 |
+| `USE_ngx_http_proxy_connect_module` | `true` | 启用正向代理 CONNECT 模块 |
+| `USE_ngx_fancyindex` | `false` | 启用美化目录浏览模块 |
+| `NGINX_FAKE_NAME` | `""` | 自定义服务器名称（伪装） |
+| `NGINX_VERSION_NUMBER` | `""` | 自定义版本号（伪装） |
+| `EXTRA_CC_OPT` | `""` | 额外编译选项 |
 
 **自定义构建示例**：
 
 ```bash
-docker build \
-  --build-arg NGINX_VERSION=1.26.1 \
-  --build-arg MODSECURITY_VERSION=3.0.12 \
-  -t nginx-hardened:custom .
+# 基本构建
+docker build -t nginx-custom:latest ./nginx/
+
+# 禁用 ModSecurity
+docker build --build-arg USE_modsecurity=false -t nginx-custom:latest ./nginx/
+
+# 自定义服务器名称
+docker build --build-arg NGINX_FAKE_NAME="MyServer" -t nginx-custom:latest ./nginx/
+
+# 指定 Nginx 版本
+docker build --build-arg NGINX_VERSION=1.28.0 -t nginx-custom:latest ./nginx/
 ```
 
 ## 卷挂载说明
 
-| 卷/挂载点 | 类型 | 说明 |
-|-----------|------|------|
-| `/etc/nginx/conf.d` | bind mount | 自定义 Nginx 配置（只读） |
-| `/usr/share/nginx/html` | bind mount | 静态资源文件（只读） |
-| `/var/log/nginx` | volume | Nginx 日志持久化 |
-| `/var/cache/nginx` | tmpfs | 缓存目录（内存文件系统） |
-| `/var/run` | tmpfs | PID 文件和套接字 |
-| `/tmp` | tmpfs | 临时文件 |
-| `/run/secrets` | Docker Secrets | SSL 证书和密钥（内存挂载） |
-
-**docker-compose.yml 示例**：
-
-```yaml
-services:
-  nginx:
-    image: nginx-hardened:latest
-    read_only: true
-    volumes:
-      - ./conf.d:/etc/nginx/conf.d:ro
-      - ./html:/usr/share/nginx/html:ro
-      - nginx-logs:/var/log/nginx
-    tmpfs:
-      - /var/cache/nginx:size=100M
-      - /var/run:size=1M
-      - /tmp:size=10M
-    secrets:
-      - ssl_certificate
-      - ssl_certificate_key
-```
+| 卷名 | 容器路径 | 说明 |
+|------|---------|------|
+| `nginx-conf` | `/opt/nginx/conf` | Nginx 配置文件 |
+| `nginx-confd` | `/opt/nginx/conf.d` | 网站配置文件（sites-available/sites-enabled） |
+| `nginx-ssl` | `/opt/nginx/ssl` | SSL 证书文件 |
+| `nginx-logs` | `/opt/nginx/logs` | 日志文件 |
+| `wwwroot` | `/www/wwwroot` | 网站根目录 |
+| `owasp` | `/opt/owasp` | OWASP 规则集 |
+| `nginx-cache` | `/var/cache/nginx` | Nginx 缓存目录 |
 
 ## 安全配置详情
 
 ### 容器运行时安全
 
+docker-compose.yml 中已配置以下安全选项：
+
 ```yaml
 services:
   nginx:
-    # 非特权容器
-    user: "101:101"
-
-    # 只读根文件系统
-    read_only: true
-
     # 限制 Capabilities
     cap_drop:
       - ALL
     cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE
+      - NET_BIND_SERVICE  # 绑定 80/443 端口
+      - CHOWN             # 修改文件属主
+      - SETUID            # 切换用户（master→worker）
+      - SETGID            # 切换用户组
+      - DAC_OVERRIDE      # 文件权限覆盖
 
     # 安全选项
     security_opt:
       - no-new-privileges:true
-      - seccomp=./security/seccomp/nginx-seccomp.json
-      - apparmor=docker-nginx
+      # - seccomp=./security/seccomp/nginx-seccomp.json
+      # - apparmor=docker-nginx
 
     # 资源限制
     deploy:
       resources:
         limits:
+          memory: 2G
           cpus: '4.0'
-          memory: 512M
+          pids: 200
         reservations:
-          cpus: '1.0'
-          memory: 128M
-
-    # PID 限制
-    pids_limit: 100
+          memory: 256M
+          cpus: '0.5'
 
     # 健康检查
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -359,7 +547,7 @@ services:
 
 ### Q: 容器启动后立即退出
 
-**A**: 检查日志 `docker logs nginx-secure`，常见原因：
+**A**: 检查日志 `docker logs nginx`，常见原因：
 1. SSL 证书文件未挂载或路径错误
 2. Seccomp Profile 缺少必要的系统调用
 3. 文件权限不正确
@@ -368,11 +556,11 @@ services:
 
 **A**: 确保证书路径正确且权限符合要求：
 ```bash
-# 使用 Docker Secrets
+# 使用 Docker Secrets 管理证书
 docker compose -f security/secrets/docker-compose-secrets.yml up -d
 
-# 或检查证书路径
-docker exec nginx-secure ls -la /run/secrets/
+# 或检查默认自签名证书
+docker exec nginx ls -la /opt/nginx/ssl/default/
 ```
 
 ### Q: ModSecurity WAF 误报
@@ -382,32 +570,25 @@ docker exec nginx-secure ls -la /run/secrets/
 SecRuleRemoveById 942100  # 排除特定规则
 ```
 
-### Q: 容器内无法写入文件
-
-**A**: 这是只读文件系统的正常行为。需要写入的目录应配置为 tmpfs：
-```yaml
-tmpfs:
-  - /var/cache/nginx
-  - /var/run
-  - /tmp
-```
-
 ### Q: 如何更新 Nginx 版本
 
 **A**: 修改 Dockerfile 中的 `NGINX_VERSION` 参数并重新构建：
 ```bash
-docker build --build-arg NGINX_VERSION=1.26.2 -t nginx-hardened:latest .
+docker build --build-arg NGINX_VERSION=1.28.0 -t nginx-custom:latest ./nginx/
 ```
+
+或使用 GitHub Actions 手动触发构建时指定版本。
 
 ### Q: 如何在生产环境部署
 
 **A**: 推荐步骤：
-1. 配置正式 SSL 证书（Let's Encrypt 或 CA 签发）
-2. 加载 AppArmor Profile 到所有节点
-3. 配置 daemon.json 安全选项
-4. 安装 auditd 审计规则
-5. 配置集中日志收集（ELK/Fluentd）
-6. 运行验证脚本确认配置
+1. 使用 GitHub Actions 构建镜像，通过 GHCR 拉取到生产服务器
+2. 配置正式 SSL 证书（Let's Encrypt 或 CA 签发）
+3. 加载 AppArmor Profile 到所有节点
+4. 配置 daemon.json 安全选项
+5. 安装 auditd 审计规则
+6. 配置集中日志收集（ELK/Fluentd）
+7. 运行验证脚本确认配置
 
 ### Q: 性能基准测试数据
 

@@ -2,17 +2,39 @@
 
 基于 CIS Docker Benchmark、CIS Nginx Benchmark 和 PCI DSS v4.0 标准的 Nginx 安全容器化部署方案。
 
-## 快速开始
+## 两种部署方式
 
-所有 Nginx 相关文件和安全配置位于 [`nginx/`](nginx/) 目录中，详细文档请参阅 [`nginx/README.md`](nginx/README.md)。
+### 方式一：使用 GHCR 预构建镜像（推荐）
+
+镜像由 GitHub Actions 自动构建并发布到 GitHub Container Registry，无需本地编译。
 
 ```bash
-# 构建镜像
 cd nginx
+
+# 拉取预构建镜像并启动（先修改 docker-compose.ghcr.yml 中的镜像地址）
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+### 方式二：本地构建
+
+在本地从源码编译 Nginx 及所有模块。
+
+```bash
+cd nginx
+
+# 构建镜像（约 15-30 分钟）
 docker compose build
 
 # 启动容器
 docker compose up -d
+```
+
+> 📖 详细教程请参阅 [`nginx/README.md`](nginx/README.md)
+
+### 验证部署
+
+```bash
+cd nginx
 
 # 运行安全检查
 bash security/cis-docker-benchmark/docker-bench-check.sh
@@ -38,13 +60,18 @@ bash tests/validate.sh
 ## 目录结构
 
 ```
+.github/
+└── workflows/
+    └── docker-build-push.yml          # GitHub Actions 构建发布工作流
+
 nginx/
 ├── Dockerfile                         # 多阶段 Docker 构建文件
-├── docker-compose.yml                 # Docker Compose 安全配置
+├── docker-compose.yml                 # Docker Compose - 本地构建用
+├── docker-compose.ghcr.yml            # Docker Compose - GHCR 镜像拉取用
 ├── docker-entrypoint.sh               # 容器入口脚本
 ├── nginx-install.sh                   # 原始裸机安装脚本（参考）
 ├── .dockerignore                      # 构建上下文排除规则
-├── README.md                          # 主文档
+├── README.md                          # 主文档（含详细教程）
 ├── security/                          # 安全配置
 │   ├── seccomp/                       # Seccomp 系统调用限制
 │   ├── apparmor/                      # AppArmor 访问控制
