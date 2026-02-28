@@ -52,9 +52,12 @@ if [ ! -f "${PGDATA}/PG_VERSION" ]; then
         echo "PostgreSQL superuser password configured from environment variable"
 
         # 创建应用数据库和用户（如果指定）
-        if [ -n "${POSTGRES_DB}" ] && [ "${POSTGRES_DB}" != "postgres" ]; then
-            # 标识符中的双引号通过双写转义（PostgreSQL 标识符标准转义）
+        # 标识符中的双引号通过双写转义（PostgreSQL 标识符标准转义）
+        if [ -n "${POSTGRES_DB}" ]; then
             ESCAPED_DB=$(printf '%s' "${POSTGRES_DB}" | sed 's/"/""/g')
+        fi
+
+        if [ -n "${POSTGRES_DB}" ] && [ "${POSTGRES_DB}" != "postgres" ]; then
             gosu postgres ${PG_DIR}/bin/psql -U postgres -c "CREATE DATABASE \"${ESCAPED_DB}\";"
             echo "Database '${POSTGRES_DB}' created"
         fi
