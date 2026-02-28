@@ -184,14 +184,25 @@ docker logs nginx
 - ✅ 支持多架构（amd64/arm64）
 - ✅ 支持版本标签管理
 
-#### 步骤 1：启用 GitHub Actions
+#### 步骤 1：配置 GitHub Secrets
+
+在仓库 **Settings** → **Secrets and variables** → **Actions** 中添加：
+
+| Secret 名称 | 说明 |
+|-------------|------|
+| `DOCKERHUB_USERNAME` | Docker Hub 用户名（例如 `ihccccom`） |
+| `DOCKERHUB_TOKEN` | Docker Hub Access Token（在 Docker Hub → Account Settings → Security 中创建） |
+
+> ⚠️ 三个镜像（Nginx、PHP-FPM、Redis）共用同一组 Secrets，只需配置一次。
+
+#### 步骤 2：启用 GitHub Actions
 
 确保仓库的 GitHub Actions 已启用：
 1. 进入仓库页面 → **Settings** → **Actions** → **General**
 2. 选择 **Allow all actions and reusable workflows**
 3. 在 **Workflow permissions** 中选择 **Read and write permissions**
 
-#### 步骤 2：触发构建
+#### 步骤 3：触发构建
 
 构建会在以下情况自动触发：
 - 推送到 `main` 分支且 `nginx/Dockerfile`、`nginx/docker-entrypoint.sh`、`nginx/.dockerignore` 有变更
@@ -203,7 +214,7 @@ docker logs nginx
 3. 可选择配置 Nginx 版本、OpenSSL 版本、是否启用 ModSecurity 等
 4. 点击 **Run workflow** 开始构建
 
-#### 步骤 3：设置仓库可见性（公开仓库可跳过）
+#### 步骤 4：设置仓库可见性（公开仓库可跳过）
 
 如果仓库是 **Public**（公开），任何人都可以直接拉取镜像，无需额外设置。
 
@@ -213,7 +224,7 @@ docker logs nginx
 3. 勾选 `read:packages` 权限
 4. 生成并保存 Token
 
-#### 步骤 4：本地登录 Docker Hub（私有仓库需要）
+#### 步骤 5：本地登录 Docker Hub（私有仓库需要）
 
 ```bash
 # 公开仓库可跳过此步骤
@@ -223,22 +234,22 @@ cat ~/.dockerhub_token | docker login -u 你的DockerHub用户名 --password-std
 rm ~/.dockerhub_token
 ```
 
-#### 步骤 5：本地拉取并运行
+#### 步骤 6：本地拉取并运行
 
 ```bash
 cd nginx
 
 # 方式一：使用 docker-compose.ghcr.yml（推荐）
 # 先编辑 docker-compose.ghcr.yml，修改 image 为你的镜像地址
-# image: <你的用户名>/nginx:latest
+# image: ihccccom/nginx:latest
 docker compose -f docker-compose.ghcr.yml up -d
 
 # 方式二：手动拉取并运行
-docker pull <你的用户名>/nginx:latest
-docker run -d -p 80:80 -p 443:443 --name nginx <你的用户名>/nginx:latest
+docker pull ihccccom/nginx:latest
+docker run -d -p 80:80 -p 443:443 --name nginx ihccccom/nginx:latest
 ```
 
-#### 步骤 6：验证
+#### 步骤 7：验证
 
 ```bash
 # 检查容器状态
@@ -258,7 +269,7 @@ docker logs nginx
 | `latest` | 推送到 main 分支 | `nginx:latest` |
 | `v1.0.0` | 创建 v1.0.0 标签 | `nginx:v1.0.0` |
 | `1.0` | 创建 v1.0.x 标签 | `nginx:1.0` |
-| `nginx-1.28.0` | 所有构建 | `nginx:nginx-1.28.0` |
+| `nginx-1.28.2` | 所有构建 | `nginx:nginx-1.28.2` |
 
 ---
 
@@ -273,8 +284,8 @@ docker logs nginx
 #### 步骤 1：克隆仓库
 
 ```bash
-git clone https://github.com/<你的用户名>/<你的仓库名>.git
-cd <你的仓库名>/nginx
+git clone https://github.com/mzwrt/copilot.git
+cd copilot/nginx
 ```
 
 #### 步骤 2：（可选）自定义构建参数
@@ -288,8 +299,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NGINX_VERSION: "1.28.0"
-        OPENSSL_VERSION: "3.5.4"
+        NGINX_VERSION: "1.28.2"
+        OPENSSL_VERSION: "3.5.5"
         USE_modsecurity: "true"
         USE_owasp: "true"
         NGINX_FAKE_NAME: "MyServer"
@@ -468,8 +479,8 @@ docker exec -it nginx /bin/bash
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_VERSION` | `1.28.0` | Nginx 版本号（必须指定） |
-| `OPENSSL_VERSION` | `3.5.4` | OpenSSL 版本号（必须指定） |
+| `NGINX_VERSION` | `1.28.2` | Nginx 版本号（必须指定） |
+| `OPENSSL_VERSION` | `3.5.5` | OpenSSL 版本号（必须指定） |
 | `PCRE2_VERSION` | `""` | PCRE2 版本，留空自动获取最新版 |
 | `FANCYINDEX_VERSION` | `0.5.2` | ngx-fancyindex 版本号 |
 | `NGX_CACHE_PURGE_VERSION` | `""` | ngx_cache_purge 版本，留空自动获取 |
@@ -482,8 +493,8 @@ docker exec -it nginx /bin/bash
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `NGINX_FAKE_NAME` | `""` | 自定义服务器名称（伪装） |
-| `NGINX_VERSION_NUMBER` | `""` | 自定义版本号（伪装 nginx.h 中的版本） |
+| `NGINX_FAKE_NAME` | `"CloudFlare"` | 自定义服务器名称（伪装），留空使用默认值 |
+| `NGINX_VERSION_NUMBER` | `"8.2.6"` | 自定义版本号（伪装 nginx.h 中的版本），留空使用默认版本号 |
 | `EXTRA_CC_OPT` | `""` | 额外 C 编译选项 |
 | `EXTRA_NGINX_MODULES` | `""` | 额外 Nginx 模块参数（如 `--add-module=/path/to/mod`） |
 
@@ -614,7 +625,7 @@ SecRuleRemoveById 942100  # 排除特定规则
 
 **A**: 修改 Dockerfile 中的 `NGINX_VERSION` 参数并重新构建：
 ```bash
-docker build --build-arg NGINX_VERSION=1.28.0 -t nginx:latest ./nginx/
+docker build --build-arg NGINX_VERSION=1.28.2 -t nginx:latest ./nginx/
 ```
 
 或使用 GitHub Actions 手动触发构建时指定版本。

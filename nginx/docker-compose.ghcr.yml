@@ -10,7 +10,7 @@
 #   4. 日志: docker compose -f docker-compose.ghcr.yml logs -f nginx
 #
 # 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
-#   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
+#   cat ~/dockerhub_token.txt | docker login -u ihccccom --password-stdin
 #
 # 如果镜像是公开的（Public），则不需要登录即可拉取
 #
@@ -20,9 +20,9 @@ services:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
     # 格式: <Docker Hub用户名>/nginx:latest
-    # 示例: mzwrt/nginx:latest
+    # 示例: ihccccom/nginx:latest
     # ================================================================
-    image: mzwrt/nginx:latest
+    image: ihccccom/nginx:latest
     container_name: nginx
 
     # 端口映射

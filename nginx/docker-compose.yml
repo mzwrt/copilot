@@ -38,8 +38,8 @@ services:
       #   USE_owasp: "true"
       #   USE_modsecurity_nginx: "true"
       #   # === 版本配置（留空自动获取最新版）===
-      #   NGINX_VERSION: "1.28.0"
-      #   OPENSSL_VERSION: "3.5.4"
+      #   NGINX_VERSION: "1.28.2"
+      #   OPENSSL_VERSION: "3.5.5"
       #   PCRE2_VERSION: ""
       #   FANCYINDEX_VERSION: "0.5.2"
       #   NGX_CACHE_PURGE_VERSION: ""

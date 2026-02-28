@@ -10,7 +10,7 @@
 #   4. 日志: docker compose -f docker-compose.ghcr.yml logs -f php
 #
 # 首次使用需要登录 Docker Hub（避免在命令行直接暴露 Token）:
-#   cat ~/dockerhub_token.txt | docker login -u <你的Docker Hub用户名> --password-stdin
+#   cat ~/dockerhub_token.txt | docker login -u ihccccom --password-stdin
 #
 # 如果镜像是公开的（Public），则不需要登录即可拉取
 #
@@ -20,9 +20,9 @@ services:
     # ================================================================
     # ⚠️ 请修改为你自己的镜像地址
     # 格式: <Docker Hub用户名>/php-fpm:latest
-    # 示例: mzwrt/php-fpm:latest
+    # 示例: ihccccom/php-fpm:latest
     # ================================================================
-    image: mzwrt/php-fpm:latest
+    image: ihccccom/php-fpm:latest
     container_name: php
 
     # 端口映射（通常 PHP-FPM 不需要暴露端口，通过 Docker 网络与 Nginx 通信）
