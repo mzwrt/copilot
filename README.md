@@ -340,6 +340,49 @@ Nginx + PHP-FPM + Redis 联合部署在以下安全基准方面已做加固：
 | Redis 密码认证 | requirepass | 防止未授权访问 |
 | Redis 危险命令重命名 | rename-command | 禁用 FLUSHDB/FLUSHALL/DEBUG |
 | Redis protected-mode | protected-mode yes | 防止外部未授权连接 |
+| Redis ACL | 用户级访问控制 | Redis 7.x 细粒度权限管理（可选） |
+
+### 可选安全模块
+
+以下安全模块默认关闭，可在构建时通过 `--build-arg` 启用：
+
+#### PHP Snuffleupagus 安全扩展
+
+[Snuffleupagus](https://snuffleupagus.readthedocs.io/) 是一个 PHP 运行时安全加固模块（Suhosin 的现代替代品），提供以下防护：
+
+| 防护功能 | 说明 |
+|---------|------|
+| Cookie 加固 | 自动为所有 Cookie 设置 HttpOnly + Secure + SameSite |
+| XXE 防护 | 全局禁用 XML 外部实体处理 |
+| Session 加密 | 使用 sodium 库自动加密 Session 数据 |
+| 邮件注入防护 | 限制 mail() 函数的发送源 |
+| 运行时配置锁定 | 阻止通过 ini_set() 降低安全级别 |
+
+**启用方式**：
+
+```bash
+# 构建时启用
+docker build --build-arg USE_snuffleupagus=true -t php-fpm:latest ./php/
+
+# 指定版本
+docker build --build-arg USE_snuffleupagus=true --build-arg SNUFFLEUPAGUS_VERSION=0.10.0 -t php-fpm:latest ./php/
+```
+
+安全规则文件位于 `php/conf/snuffleupagus.rules`，可根据应用需求自定义。
+
+#### Redis ACL (Access Control List)
+
+Redis 7.x 原生支持 ACL 用户管理，提供比 `requirepass` 更细粒度的访问控制：
+
+```redis
+# 创建只读用户
+user readonly_user on >readonly_password ~* &* +@read -@write -@admin -@dangerous
+
+# 创建应用用户（允许读写，禁止管理命令）
+user app_user on >app_password ~app:* &* +@read +@write -@admin -@dangerous
+```
+
+ACL 配置已在 `redis/conf/redis.conf` 中提供注释示例，取消注释即可启用。
 
 ### 容器间通信安全
 

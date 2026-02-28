@@ -69,6 +69,14 @@ on:
         options:
           - 'true'
           - 'false'
+      use_snuffleupagus:
+        description: '启用 Snuffleupagus 安全扩展'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
       platforms:
         description: '构建平台（多架构）'
         required: false
@@ -177,6 +185,7 @@ jobs:
             USE_imagick=${{ github.event.inputs.use_imagick || 'true' }}
             USE_mongodb=${{ github.event.inputs.use_mongodb || 'false' }}
             USE_swoole=${{ github.event.inputs.use_swoole || 'false' }}
+            USE_snuffleupagus=${{ github.event.inputs.use_snuffleupagus || 'false' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

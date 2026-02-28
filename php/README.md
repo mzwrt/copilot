@@ -267,6 +267,7 @@ bash tests/validate.sh
 | `USE_mongodb` | `false` | 启用 MongoDB 扩展 |
 | `USE_swoole` | `false` | 启用 Swoole 扩展 |
 | `USE_opcache` | `true` | 启用 OPcache 扩展（含 JIT） |
+| `USE_snuffleupagus` | `false` | 启用 Snuffleupagus 安全扩展（运行时 PHP 防护） |
 
 ### 版本配置（留空自动获取最新版）
 
@@ -278,6 +279,7 @@ bash tests/validate.sh
 | `IMAGICK_VERSION` | `""` | ImageMagick 扩展版本，留空自动获取最新版 |
 | `MONGODB_VERSION` | `""` | MongoDB 扩展版本，留空自动获取最新版 |
 | `SWOOLE_VERSION` | `""` | Swoole 扩展版本，留空自动获取最新版 |
+| `SNUFFLEUPAGUS_VERSION` | `""` | Snuffleupagus 版本，留空使用最新版 |
 
 ### 其他配置
 
@@ -293,6 +295,9 @@ docker build -t php-fpm:latest ./php/
 
 # 启用 Swoole
 docker build --build-arg USE_swoole=true -t php-fpm:latest ./php/
+
+# 启用 Snuffleupagus 安全扩展
+docker build --build-arg USE_snuffleupagus=true -t php-fpm:latest ./php/
 
 # 指定 PHP 版本
 docker build --build-arg PHP_VERSION=8.3.15 -t php-fpm:latest ./php/

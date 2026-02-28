@@ -33,6 +33,7 @@ services:
       #   USE_mongodb: "false"
       #   USE_swoole: "false"
       #   USE_opcache: "true"
+      #   USE_snuffleupagus: "false"      # PHP 安全加固模块
       #   # === 版本配置（留空自动获取最新版）===
       #   PHP_VERSION: "8.4.4"
       #   REDIS_VERSION: ""
@@ -40,6 +41,7 @@ services:
       #   IMAGICK_VERSION: ""
       #   MONGODB_VERSION: ""
       #   SWOOLE_VERSION: ""
+      #   SNUFFLEUPAGUS_VERSION: ""
       #   # === 自定义扩展 ===
       #   EXTRA_PHP_EXTENSIONS: ""
     image: php-fpm:latest

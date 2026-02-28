@@ -38,6 +38,9 @@ ARG USE_swoole=false
 # OPcache 扩展（强烈推荐启用）
 ARG USE_opcache=true
 
+# Snuffleupagus 安全扩展（PHP 安全加固模块，运行时防护）
+ARG USE_snuffleupagus=false
+
 ###############################################
 # 版本配置 (Version Configuration)
 # 留空 "" 表示自动获取最新版本
@@ -63,6 +66,9 @@ ARG MONGODB_VERSION=""
 # Swoole 扩展版本（留空自动获取最新版）
 ARG SWOOLE_VERSION=""
 
+# Snuffleupagus 安全扩展版本（留空使用最新版）
+ARG SNUFFLEUPAGUS_VERSION=""
+
 ###############################################
 # 额外 PHP 扩展入口 (Extra PHP Extensions)
 # 可添加额外的 --enable 或 --with 参数
@@ -86,12 +92,14 @@ ARG USE_imagick
 ARG USE_mongodb
 ARG USE_swoole
 ARG USE_opcache
+ARG USE_snuffleupagus
 ARG PHP_VERSION
 ARG REDIS_VERSION
 ARG MEMCACHED_VERSION
 ARG IMAGICK_VERSION
 ARG MONGODB_VERSION
 ARG SWOOLE_VERSION
+ARG SNUFFLEUPAGUS_VERSION
 ARG EXTRA_PHP_EXTENSIONS
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -177,12 +185,11 @@ RUN set -eux; \
       --with-openssl \
       --with-zlib \
       --with-curl \
-      --with-gd \
+      --enable-gd \
       --with-jpeg \
       --with-freetype \
       --with-webp \
       --with-avif \
-      --enable-gd \
       --with-zip \
       --with-sodium \
       --with-password-argon2 \
@@ -262,6 +269,26 @@ RUN set -eux; \
       fi; \
     fi
 
+# Snuffleupagus 安全扩展（PHP 运行时安全加固）
+RUN set -eux; \
+    if [ "${USE_snuffleupagus}" = "true" ]; then \
+      cd ${PHP_SRC_DIR}; \
+      if [ -n "${SNUFFLEUPAGUS_VERSION}" ]; then \
+        git clone --depth 1 -b "v${SNUFFLEUPAGUS_VERSION}" \
+          https://github.com/jvoisin/snuffleupagus.git; \
+      else \
+        git clone --depth 1 https://github.com/jvoisin/snuffleupagus.git; \
+      fi; \
+      cd snuffleupagus/src; \
+      ${PHP_DIR}/bin/phpize; \
+      ./configure --with-php-config=${PHP_DIR}/bin/php-config; \
+      make -j$(nproc); \
+      make install; \
+    fi
+
+# 清理源码目录以减小镜像体积
+RUN rm -rf ${PHP_SRC_DIR}
+
 
 # =======================================================
 # Stage 2: 运行阶段 (Runtime Stage)
@@ -285,6 +312,7 @@ ARG USE_imagick
 ARG USE_mongodb
 ARG USE_swoole
 ARG USE_opcache
+ARG USE_snuffleupagus
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PHP_DIR=/opt/php \
@@ -369,7 +397,14 @@ RUN set -eux; \
     fi; \
     if [ "${USE_swoole}" = "true" ]; then \
       echo "extension=swoole.so" > ${PHP_DIR}/etc/conf.d/20-swoole.ini; \
+    fi; \
+    if [ "${USE_snuffleupagus}" = "true" ]; then \
+      echo "extension=snuffleupagus.so" > ${PHP_DIR}/etc/conf.d/30-snuffleupagus.ini; \
+      echo "sp.configuration_file=${PHP_DIR}/etc/snuffleupagus.rules" >> ${PHP_DIR}/etc/conf.d/30-snuffleupagus.ini; \
     fi
+
+# 复制 Snuffleupagus 安全规则配置（条件性使用）
+COPY conf/snuffleupagus.rules ${PHP_DIR}/etc/snuffleupagus.rules
 
 # 创建默认 PHP 测试页面
 RUN echo '<?php phpinfo(); ?>' > /www/wwwroot/html/phpinfo.php
