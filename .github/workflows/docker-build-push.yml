@@ -112,7 +112,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # ==========================================
-      # 5. 提取 Docker 元数据（标签和标签）
+      # 5. 提取 Docker 元数据（标签和注释）
       # ==========================================
       - name: Extract Docker metadata
         id: meta
@@ -127,7 +127,7 @@ jobs:
             # main 分支推送 → latest
             type=raw,value=latest,enable={{is_default_branch}}
             # 所有推送 → SHA 短标签
-            type=sha,prefix=,format=short
+            type=sha,prefix=sha-,format=short
             # 包含 Nginx 版本号
             type=raw,value=nginx-${{ github.event.inputs.nginx_version || '1.28.0' }}
 

@@ -203,8 +203,10 @@ docker logs nginx
 
 ```bash
 # 公开仓库可跳过此步骤
-# 使用 Personal Access Token 登录
-echo "你的TOKEN" | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
+# 将 Token 保存到文件，避免在命令行直接暴露
+echo "你的TOKEN" > ~/.ghcr_token
+cat ~/.ghcr_token | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
+rm ~/.ghcr_token
 ```
 
 #### 步骤 5：本地拉取并运行
