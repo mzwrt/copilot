@@ -56,39 +56,52 @@ nginx/
 ├── docker-entrypoint.sh               # 容器入口脚本（权限检查）
 ├── nginx-install.sh                   # 原始裸机安装脚本（参考用）
 ├── .dockerignore                      # 构建上下文排除规则
-├── README.md                          # 📖 本文件
+├── README.md                          # 📖 编译构建教程（本文件）
+├── DOCKER-USAGE.md                    # 📖 Docker 使用教程（可独立发布）
+│
+├── conf/                              # Nginx 配置文件（内置，构建时 COPY 到镜像）
+│   ├── nginx.conf                    # Nginx 主配置文件
+│   ├── proxy.conf                    # 反向代理和缓存配置
+│   ├── index.html                    # 默认首页
+│   ├── php/
+│   │   ├── pathinfo.conf            # PHP Pathinfo 支持
+│   │   └── enable-php-84.conf       # PHP 8.4 FastCGI 配置
+│   └── modsecurity/
+│       ├── modsecurity.conf         # ModSecurity 主配置
+│       ├── main.conf                # OWASP 规则引入配置
+│       ├── crs-setup.conf           # OWASP CRS 偏好设置
+│       ├── hosts.allow              # IP 白名单
+│       └── hosts.deny               # IP 黑名单
 │
 ├── security/                          # 安全配置目录
 │   ├── seccomp/
 │   │   ├── nginx-seccomp.json        # Seccomp 系统调用白名单
 │   │   └── README.md                 # 📖 Seccomp 配置说明
-│   │
 │   ├── apparmor/
 │   │   ├── nginx-apparmor-profile    # AppArmor 强制访问控制策略
 │   │   └── README.md                 # 📖 AppArmor 配置说明
-│   │
 │   ├── secrets/
 │   │   ├── docker-compose-secrets.yml # Docker Secrets 集成示例
 │   │   └── README.md                 # 📖 Secrets 管理说明
-│   │
 │   ├── audit/
-│   │   ├── docker-audit.rules        # Auditd 审计规则（监控 Docker 操作）
+│   │   ├── docker-audit.rules        # Auditd 审计规则
 │   │   ├── daemon.json               # Docker 守护进程安全配置
 │   │   ├── daemon.json.comments      # daemon.json 配置项注释说明
 │   │   └── README.md                 # 📖 日志与审计说明
-│   │
 │   ├── cis-docker-benchmark/
 │   │   ├── docker-bench-check.sh     # CIS Docker Benchmark 自动检查脚本
 │   │   └── README.md                 # 📖 CIS Docker 基准清单
-│   │
 │   ├── cis-nginx-benchmark/
 │   │   └── README.md                 # 📖 CIS Nginx 基准清单
-│   │
 │   ├── pci-dss/
 │   │   └── README.md                 # 📖 PCI DSS 合规对照
-│   │
 │   └── performance/
 │       └── README.md                 # 📖 性能调优指南
+│
+├── deploy/                            # 部署包（可发布到其他仓库供用户使用）
+│   ├── README.md                     # Docker 使用教程
+│   ├── docker-compose.yml            # 用户部署用 Compose 文件
+│   └── security/                     # 安全配置（Seccomp/AppArmor）
 │
 └── tests/
     ├── validate.sh                   # 自动化安全验证脚本
@@ -96,6 +109,8 @@ nginx/
 ```
 
 ## 快速开始
+
+> 📖 **Docker 使用教程**（部署、配置、运维）已独立为 **[DOCKER-USAGE.md](DOCKER-USAGE.md)**，方便发布到其他仓库供用户使用。
 
 ### 方式一：使用预构建镜像（推荐 - 从 GHCR 拉取）
 
