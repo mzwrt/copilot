@@ -520,6 +520,10 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     && chmod 400 ${NGINX_DIR}/ssl/default/default.key \
     && chmod 600 ${NGINX_DIR}/ssl/default/default.pem
 
+# PCI DSS 4.1 - 生成 DH 参数（>= 2048 位）用于 TLS 密钥交换
+RUN openssl dhparam -out ${NGINX_DIR}/ssl/dhparam.pem 2048 \
+    && chmod 600 ${NGINX_DIR}/ssl/dhparam.pem
+
 # ============================================================
 # 复制本地配置文件（不再从外部下载，所有配置内置于仓库中）
 # ============================================================

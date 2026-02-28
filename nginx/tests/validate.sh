@@ -296,6 +296,83 @@ test_nginx() {
     else
         pass "SSL/TLS: SSLv3 已禁用"
     fi
+
+    # 检查 SSL/TLS 配置 - 拒绝 TLS 1.0（PCI DSS 要求）
+    local tls10_result
+    tls10_result=$(echo | timeout 5 openssl s_client -tls1 -connect 127.0.0.1:443 2>&1) || true
+    if echo "${tls10_result}" | grep -qi "unknown option\|no protocols available\|unsupported\|ssl handshake failure\|wrong version\|no cipher\|alert protocol"; then
+        pass "SSL/TLS: TLS 1.0 已禁用 (PCI DSS 4.1)"
+    elif echo "${tls10_result}" | grep -qi "CONNECTED" && ! echo "${tls10_result}" | grep -qi "error\|alert"; then
+        fail "SSL/TLS: TLS 1.0 仍然启用（不符合 PCI DSS）"
+    else
+        pass "SSL/TLS: TLS 1.0 已禁用 (PCI DSS 4.1)"
+    fi
+
+    # 检查 SSL/TLS 配置 - 拒绝 TLS 1.1（PCI DSS 要求）
+    local tls11_result
+    tls11_result=$(echo | timeout 5 openssl s_client -tls1_1 -connect 127.0.0.1:443 2>&1) || true
+    if echo "${tls11_result}" | grep -qi "unknown option\|no protocols available\|unsupported\|ssl handshake failure\|wrong version\|no cipher\|alert protocol"; then
+        pass "SSL/TLS: TLS 1.1 已禁用 (PCI DSS 4.1)"
+    elif echo "${tls11_result}" | grep -qi "CONNECTED" && ! echo "${tls11_result}" | grep -qi "error\|alert"; then
+        fail "SSL/TLS: TLS 1.1 仍然启用（不符合 PCI DSS）"
+    else
+        pass "SSL/TLS: TLS 1.1 已禁用 (PCI DSS 4.1)"
+    fi
+
+    # 检查 HSTS 响应头配置（PCI DSS 4.2.1 / CIS 4.1.13）
+    # 注：默认服务器返回 444 时不会发送响应头，检查配置文件中是否包含 HSTS 指令
+    local hsts_configured
+    hsts_configured=$(docker_exec grep -r "Strict-Transport-Security" "${NGINX_DIR}/conf/" 2>/dev/null) || hsts_configured=""
+    if [[ -n "${hsts_configured}" ]]; then
+        pass "HSTS 已在配置中启用 (PCI DSS 4.2.1 / CIS 4.1.13)"
+    else
+        fail "HSTS 未在配置中启用 (PCI DSS 4.2.1)"
+    fi
+
+    # 检查 Content-Security-Policy 配置
+    local csp_configured
+    csp_configured=$(docker_exec grep -r "Content-Security-Policy" "${NGINX_DIR}/conf/" 2>/dev/null) || csp_configured=""
+    if [[ -n "${csp_configured}" ]]; then
+        pass "Content-Security-Policy 已在配置中启用"
+    else
+        fail "Content-Security-Policy 未在配置中启用"
+    fi
+
+    # 检查 Referrer-Policy 配置
+    local rp_configured
+    rp_configured=$(docker_exec grep -r "Referrer-Policy" "${NGINX_DIR}/conf/" 2>/dev/null) || rp_configured=""
+    if [[ -n "${rp_configured}" ]]; then
+        pass "Referrer-Policy 已在配置中启用"
+    else
+        fail "Referrer-Policy 未在配置中启用"
+    fi
+
+    # 检查 Permissions-Policy 配置
+    local pp_configured
+    pp_configured=$(docker_exec grep -r "Permissions-Policy" "${NGINX_DIR}/conf/" 2>/dev/null) || pp_configured=""
+    if [[ -n "${pp_configured}" ]]; then
+        pass "Permissions-Policy 已在配置中启用"
+    else
+        fail "Permissions-Policy 未在配置中启用"
+    fi
+
+    # 检查 SSL/TLS 协议配置（CIS 4.1.3）
+    local ssl_protocols_conf
+    ssl_protocols_conf=$(docker_exec grep -r "ssl_protocols" "${NGINX_DIR}/conf/" 2>/dev/null) || ssl_protocols_conf=""
+    if echo "${ssl_protocols_conf}" | grep -q "TLSv1.2"; then
+        pass "SSL 协议已配置 TLSv1.2 (CIS 4.1.3)"
+    else
+        fail "SSL 协议未正确配置 (CIS 4.1.3)"
+    fi
+
+    # 检查 DH 参数文件是否存在（PCI DSS）
+    local dhparam_exists
+    dhparam_exists=$(docker_exec test -f "${NGINX_DIR}/ssl/dhparam.pem" && echo "yes") || dhparam_exists=""
+    if [[ "${dhparam_exists}" == "yes" ]]; then
+        pass "DH 参数文件已生成 (PCI DSS TLS 合规)"
+    else
+        fail "DH 参数文件不存在 (PCI DSS TLS 合规)"
+    fi
 }
 
 # ============================================================
