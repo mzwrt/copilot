@@ -469,7 +469,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblua5.3-0 \
     zlib1g \
     openssl \
-    wget \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -508,17 +507,21 @@ RUN mkdir -p \
     /opt/owasp/owasp-rules/plugins \
     /var/cache/nginx/client_temp \
     /var/cache/nginx/proxy_temp \
+    /var/cache/nginx/proxy_cache \
     /var/cache/nginx/fastcgi_temp \
     /var/cache/nginx/uwsgi_temp \
     /var/cache/nginx/scgi_temp
 
 # 根据 CIS Nginx 2.4.2 - 创建默认自签名 SSL 证书
+# PCI DSS 4.1 - 生成 DH 参数（>= 2048 位）用于 TLS 密钥交换
 RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
       -keyout ${NGINX_DIR}/ssl/default/default.key \
       -out ${NGINX_DIR}/ssl/default/default.pem \
       -subj "/C=XX/ST=Default/L=Default/O=Default/CN=localhost" \
     && chmod 400 ${NGINX_DIR}/ssl/default/default.key \
-    && chmod 600 ${NGINX_DIR}/ssl/default/default.pem
+    && chmod 600 ${NGINX_DIR}/ssl/default/default.pem \
+    && openssl dhparam -out ${NGINX_DIR}/ssl/dhparam.pem 2048 \
+    && chmod 600 ${NGINX_DIR}/ssl/dhparam.pem
 
 # ============================================================
 # 复制本地配置文件（不再从外部下载，所有配置内置于仓库中）
@@ -533,12 +536,12 @@ RUN sed -i "s|%NGINX_DIR%|${NGINX_DIR}|g" ${NGINX_DIR}/conf/nginx.conf \
 
 # 根据编译选项条件性禁用 nginx.conf 中的模块配置
 # 如果 Brotli 未编译，注释掉 brotli 指令（避免 "unknown directive" 错误）
+# 如果 ModSecurity 未编译，注释掉 modsecurity 指令
 RUN if [ "${USE_ngx_brotli}" != "true" ]; then \
       sed -i '/\[BROTLI_START\]/,/\[BROTLI_END\]/{ /\[BROTLI_START\]/d; /\[BROTLI_END\]/d; s/^/# /; }' \
         ${NGINX_DIR}/conf/nginx.conf; \
-    fi
-# 如果 ModSecurity 未编译，注释掉 modsecurity 指令
-RUN if [ "${USE_modsecurity_nginx}" != "true" ]; then \
+    fi \
+    && if [ "${USE_modsecurity_nginx}" != "true" ]; then \
       sed -i '/\[MODSECURITY_START\]/,/\[MODSECURITY_END\]/{ /\[MODSECURITY_START\]/d; /\[MODSECURITY_END\]/d; s/^/# /; }' \
         ${NGINX_DIR}/conf/nginx.conf; \
     fi
@@ -577,11 +580,11 @@ RUN set -eux; \
       # 创建 plugins 目录
       mkdir -p /opt/owasp/owasp-rules/plugins; \
       # 下载 WordPress 规则排除插件（可选）
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-before.conf \
+      curl -sSL --retry 5 --retry-delay 2 --retry-connrefused \
+        -o /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-before.conf \
         "https://raw.githubusercontent.com/coreruleset/wordpress-rule-exclusions-plugin/master/plugins/wordpress-rule-exclusions-before.conf" || true; \
-      wget -q --tries=5 --waitretry=2 --no-check-certificate \
-        -O /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-config.conf \
+      curl -sSL --retry 5 --retry-delay 2 --retry-connrefused \
+        -o /opt/owasp/owasp-rules/plugins/wordpress-rule-exclusions-config.conf \
         "https://raw.githubusercontent.com/coreruleset/wordpress-rule-exclusions-plugin/master/plugins/wordpress-rule-exclusions-config.conf" || true; \
       # 重命名排除规则样例文件
       if [ -f /opt/owasp/owasp-rules/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf.example ]; then \
@@ -597,45 +600,36 @@ RUN set -eux; \
 # 复制默认首页
 COPY conf/index.html /www/wwwroot/html/index.html
 
-# 创建 PID 文件
-RUN touch ${NGINX_DIR}/logs/nginx.pid
-
 # ============================================================
 # 文件权限设置（CIS Nginx Benchmark 合规）
+# 合并为单个 RUN 层以减小镜像体积
 # ============================================================
-
-# CIS Nginx - 配置文件权限
-RUN find ${NGINX_DIR}/conf -type d -exec chmod 700 {} \; \
+RUN touch ${NGINX_DIR}/logs/nginx.pid \
+    # CIS Nginx - 配置文件权限
+    && find ${NGINX_DIR}/conf -type d -exec chmod 700 {} \; \
     && find ${NGINX_DIR}/conf -type f -exec chmod 600 {} \; \
     && find ${NGINX_DIR}/conf.d -type d -exec chmod 700 {} \; \
-    && find ${NGINX_DIR}/conf.d -type f -exec chmod 600 {} \;
-
-# CIS Nginx - SSL 证书权限
-RUN chmod 700 ${NGINX_DIR}/ssl \
-    && chmod 700 ${NGINX_DIR}/ssl/default
-
-# CIS Nginx - 日志目录权限
-RUN chmod 750 ${NGINX_DIR}/logs \
-    && chmod u-x,go-wx ${NGINX_DIR}/logs/nginx.pid
-
-# CIS Nginx - 模块目录权限
-RUN [ -d "${NGINX_DIR}/modules" ] && chmod 750 ${NGINX_DIR}/modules || true
-
-# OWASP 规则文件权限
-RUN find /opt/owasp -type d -exec chmod 700 {} \; 2>/dev/null || true \
-    && find /opt/owasp -type f -name "*.conf" -exec chmod 600 {} \; -exec chown root:root {} \; 2>/dev/null || true \
-    && chown -R root:root /opt/owasp 2>/dev/null || true
-
-# CIS Nginx 2.5.2 - 默认网站目录权限
-RUN chown -R www-data:www-data /www/wwwroot/html \
+    && find ${NGINX_DIR}/conf.d -type f -exec chmod 600 {} \; \
+    # CIS Nginx - SSL 证书权限
+    && chmod 700 ${NGINX_DIR}/ssl \
+    && chmod 700 ${NGINX_DIR}/ssl/default \
+    # CIS Nginx - 日志目录权限
+    && chmod 750 ${NGINX_DIR}/logs \
+    && chmod u-x,go-wx ${NGINX_DIR}/logs/nginx.pid \
+    # CIS Nginx - 模块目录权限
+    && { [ -d "${NGINX_DIR}/modules" ] && chmod 750 ${NGINX_DIR}/modules || true; } \
+    # OWASP 规则文件权限
+    && { find /opt/owasp -type d -exec chmod 700 {} \; 2>/dev/null || true; } \
+    && { find /opt/owasp -type f -name "*.conf" -exec chmod 600 {} \; -exec chown root:root {} \; 2>/dev/null || true; } \
+    && { chown -R root:root /opt/owasp 2>/dev/null || true; } \
+    # CIS Nginx 2.5.2 - 默认网站目录权限
+    && chown -R www-data:www-data /www/wwwroot/html \
     && chmod 755 /www/wwwroot/html \
-    && find /www/wwwroot/html -type f -exec chmod 444 {} \;
-
-# Nginx 目录属主
-RUN chown -R root:root ${NGINX_DIR}
-
-# Nginx 缓存目录权限
-RUN chown -R www-data:www-data /var/cache/nginx
+    && find /www/wwwroot/html -type f -exec chmod 444 {} \; \
+    # Nginx 目录属主
+    && chown -R root:root ${NGINX_DIR} \
+    # Nginx 缓存目录权限
+    && chown -R www-data:www-data /var/cache/nginx
 
 # CIS Docker 4.9 - 使用 COPY 而非 ADD
 COPY docker-entrypoint.sh /docker-entrypoint.sh

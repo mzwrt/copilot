@@ -72,6 +72,12 @@ services:
     # CIS 5.12 - 限制容器重启策略
     restart: unless-stopped
 
+    # CIS 5.12 - 只读根文件系统（最小攻击面）
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run:rw,noexec,nosuid,size=8m
+
     # CIS 5.26 - 健康检查
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1/"]
