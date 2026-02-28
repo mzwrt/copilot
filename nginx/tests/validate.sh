@@ -381,7 +381,7 @@ test_modsecurity() {
 
     # 检查 ModSecurity 配置文件是否存在
     local modsec_config_exists
-    modsec_config_exists=$(docker_exec test -f "${NGINX_DIR}/src/ModSecurity/modsecurity.conf" && echo "yes") || modsec_config_exists=""
+    modsec_config_exists=$(docker_exec test -f "${NGINX_DIR}/conf/modsecurity/modsecurity.conf" && echo "yes") || modsec_config_exists=""
     if [[ "${modsec_config_exists}" == "yes" ]]; then
         pass "ModSecurity 配置文件存在"
     else
