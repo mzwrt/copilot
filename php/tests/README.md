@@ -19,7 +19,7 @@
 
 ### PHP-FPM 服务测试
 - PHP-FPM 进程运行状态
-- 端口 9000 监听状态
+- 端口 36000 监听状态
 - PHP 版本信息
 - expose_php 安全配置
 - disable_functions 安全限制

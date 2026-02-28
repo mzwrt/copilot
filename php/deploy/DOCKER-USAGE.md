@@ -175,7 +175,7 @@ Nginx 站点配置：
 ```nginx
 location ~ [^/]\.php(/|$) {
     try_files $uri =404;
-    fastcgi_pass php:9000;
+    fastcgi_pass php:36000;
     fastcgi_index index.php;
     include fastcgi.conf;
     include php/pathinfo.conf;

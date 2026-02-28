@@ -27,7 +27,8 @@ mkdir -p /www/wwwroot/html 2>/dev/null || true
 if [ "$1" = "/opt/nginx/sbin/nginx" ] || [ "$1" = "nginx" ]; then
     echo "正在验证 Nginx 配置..."
     if ! /opt/nginx/sbin/nginx -t 2>&1; then
-        echo "警告: Nginx 配置验证未通过，请检查配置文件"
+        echo "错误: Nginx 配置验证未通过，请检查配置文件" >&2
+        exit 1
     fi
 fi
 
